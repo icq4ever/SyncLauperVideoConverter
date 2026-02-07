@@ -94,7 +94,7 @@ wails build -platform windows/amd64
 
 ## 라이선스
 
-Copyright (c) 2026 [studio42](https://studio42.kr). All rights reserved.
+이 프로젝트는 [MIT 라이선스](LICENSE)로 배포됩니다.
 
 ## 링크
 
