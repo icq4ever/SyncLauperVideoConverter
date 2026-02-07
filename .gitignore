@@ -1,0 +1,30 @@
+# Build output
+build/bin/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/wailsjs/
+
+# OS
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# FFmpeg binaries (배포용, 저장소에 포함하지 않음)
+ffmpeg.exe
+ffprobe.exe

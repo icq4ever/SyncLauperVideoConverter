@@ -1,0 +1,245 @@
+package preset
+
+import (
+	"fmt"
+	"math"
+)
+
+// FileInfo represents source file information (used for dynamic preset calculation)
+type FileInfo struct {
+	Width     int
+	Height    int
+	Framerate float64
+}
+
+// GetAllPresets returns all available SyncLauper presets
+func GetAllPresets() []Preset {
+	return []Preset{
+		{
+			Name:         "원본 설정 유지",
+			Resolution:   "source",
+			Framerate:    "source",
+			Width:        0,
+			Height:       0,
+			Level:        "auto",
+			FPS:          0,
+			UseSourceFPS: true,
+			UseSourceRes: true,
+		},
+		{
+			Name:       "HEVC 4K|60p",
+			Resolution: "4K",
+			Framerate:  "60",
+			Width:      3840,
+			Height:     2160,
+			Level:      "5.1",
+			FPS:        60,
+		},
+		{
+			Name:       "HEVC 4K|30p",
+			Resolution: "4K",
+			Framerate:  "30",
+			Width:      3840,
+			Height:     2160,
+			Level:      "5.0",
+			FPS:        30,
+		},
+		{
+			Name:       "HEVC 4K|29.97p",
+			Resolution: "4K",
+			Framerate:  "29.97",
+			Width:      3840,
+			Height:     2160,
+			Level:      "5.0",
+			FPS:        29.97,
+		},
+		{
+			Name:       "HEVC 4K|24p",
+			Resolution: "4K",
+			Framerate:  "24",
+			Width:      3840,
+			Height:     2160,
+			Level:      "5.0",
+			FPS:        24,
+		},
+		{
+			Name:       "HEVC 4K|23.976p",
+			Resolution: "4K",
+			Framerate:  "23.976",
+			Width:      3840,
+			Height:     2160,
+			Level:      "5.0",
+			FPS:        23.976,
+		},
+		{
+			Name:       "HEVC 1080p|60p",
+			Resolution: "1080p",
+			Framerate:  "60",
+			Width:      1920,
+			Height:     1080,
+			Level:      "4.1",
+			FPS:        60,
+		},
+		{
+			Name:       "HEVC 1080p|30p",
+			Resolution: "1080p",
+			Framerate:  "30",
+			Width:      1920,
+			Height:     1080,
+			Level:      "4.1",
+			FPS:        30,
+		},
+		{
+			Name:       "HEVC 1080p|29.97p",
+			Resolution: "1080p",
+			Framerate:  "29.97",
+			Width:      1920,
+			Height:     1080,
+			Level:      "4.1",
+			FPS:        29.97,
+		},
+		{
+			Name:       "HEVC 1080p|24p",
+			Resolution: "1080p",
+			Framerate:  "24",
+			Width:      1920,
+			Height:     1080,
+			Level:      "4.1",
+			FPS:        24,
+		},
+		{
+			Name:       "HEVC 1080p|23.976p",
+			Resolution: "1080p",
+			Framerate:  "23.976",
+			Width:      1920,
+			Height:     1080,
+			Level:      "4.1",
+			FPS:        23.976,
+		},
+	}
+}
+
+// GetPresetByName returns a preset by its name
+func GetPresetByName(name string) *Preset {
+	for _, p := range GetAllPresets() {
+		if p.Name == name {
+			return &p
+		}
+	}
+	return nil
+}
+
+// DetermineLevel determines the appropriate H.265 level based on resolution and framerate
+func DetermineLevel(width, height int, fps float64) string {
+	is4K := width > 1920 || height > 1080
+	isHighFPS := fps > 30
+
+	if is4K && isHighFPS {
+		return "5.1"
+	} else if is4K {
+		return "5.0"
+	}
+	return "4.1"
+}
+
+// ToFFmpegArgs converts a preset to FFmpeg arguments
+func (p *Preset) ToFFmpegArgs(inputPath, outputPath string, sourceInfo *FileInfo) []string {
+	settings := DefaultSettings()
+
+	// Determine effective values for source-based preset
+	effectiveWidth := p.Width
+	effectiveHeight := p.Height
+	effectiveFPS := p.FPS
+	effectiveLevel := p.Level
+
+	if p.UseSourceRes && sourceInfo != nil {
+		effectiveWidth = sourceInfo.Width
+		effectiveHeight = sourceInfo.Height
+	}
+
+	if p.UseSourceFPS && sourceInfo != nil {
+		effectiveFPS = sourceInfo.Framerate
+	}
+
+	// Calculate level for "auto" or source-based preset
+	if effectiveLevel == "auto" && sourceInfo != nil {
+		effectiveLevel = DetermineLevel(effectiveWidth, effectiveHeight, effectiveFPS)
+	}
+
+	// Build x265 params
+	keyint := int(math.Round(effectiveFPS))
+	if keyint <= 0 {
+		keyint = 30 // fallback
+	}
+
+	x265Params := fmt.Sprintf(
+		"keyint=%d:min-keyint=%d:open-gop=0:scenecut=0:repeat-headers=1:ref=4:bframes=3:hrd=1",
+		keyint, keyint,
+	)
+
+	args := []string{
+		"-i", inputPath,
+		// Video codec
+		"-c:v", "libx265",
+		"-crf", fmt.Sprintf("%d", settings.Quality),
+		"-preset", settings.EncoderPreset,
+		"-tune", settings.EncoderTune,
+		"-profile:v", settings.EncoderProfile,
+		"-level:v", effectiveLevel,
+		"-x265-params", x265Params,
+	}
+
+	// Add resolution if not using source
+	if !p.UseSourceRes && p.Width > 0 && p.Height > 0 {
+		args = append(args, "-vf", fmt.Sprintf("scale=%d:%d", p.Width, p.Height))
+	}
+
+	// Add framerate if not using source
+	if !p.UseSourceFPS && p.FPS > 0 {
+		args = append(args, "-r", fmt.Sprintf("%.3f", p.FPS))
+	}
+
+	// CFR mode
+	if settings.CFR {
+		args = append(args, "-vsync", "cfr")
+	}
+
+	// Audio settings
+	args = append(args,
+		"-c:a", "aac",
+		"-b:a", fmt.Sprintf("%dk", settings.AudioBitrate),
+		"-ac", "2",
+	)
+
+	// Deinterlace filter (equivalent to HandBrake's decomb)
+	if settings.Decomb {
+		// Use yadif in auto mode: only deinterlace if input is interlaced
+		if !p.UseSourceRes && p.Width > 0 {
+			// Already have a -vf, need to prepend yadif
+			for i, arg := range args {
+				if arg == "-vf" && i+1 < len(args) {
+					args[i+1] = "yadif=mode=0:parity=-1:deint=1," + args[i+1]
+					break
+				}
+			}
+		} else {
+			args = append(args, "-vf", "yadif=mode=0:parity=-1:deint=1")
+		}
+	}
+
+	// Output format
+	args = append(args, "-f", "matroska")
+
+	// Output path (must be last)
+	args = append(args, outputPath)
+
+	return args
+}
+
+// GetPresetInfo returns a human-readable description of the preset
+func (p *Preset) GetPresetInfo() string {
+	if p.UseSourceRes && p.UseSourceFPS {
+		return "원본 해상도 및 프레임레이트 유지, HEVC 인코딩"
+	}
+	return fmt.Sprintf("%s @ %sfps, HEVC 인코딩", p.Resolution, p.Framerate)
+}
