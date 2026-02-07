@@ -1,10 +1,12 @@
 # Build output
-build/bin/
+build/
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
 frontend/wailsjs/
+frontend/package.json.md5
+frontend/README.md
 
 # OS
 .DS_Store
