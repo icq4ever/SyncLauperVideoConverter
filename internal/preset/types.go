@@ -30,6 +30,22 @@ type EncodingSettings struct {
 	CFR            bool   `json:"cfr"`            // true (constant framerate)
 }
 
+// QualityLevel represents a selectable quality option
+type QualityLevel struct {
+	Name  string `json:"name"`
+	Label string `json:"label"`
+	Value int    `json:"value"`
+}
+
+// GetQualityLevels returns available quality options
+func GetQualityLevels() []QualityLevel {
+	return []QualityLevel{
+		{Name: "normal", Label: "일반", Value: 22},
+		{Name: "high", Label: "고품질", Value: 18},
+		{Name: "highest", Label: "최고품질", Value: 14},
+	}
+}
+
 // DefaultSettings returns the default encoding settings for SyncLauper
 func DefaultSettings() EncodingSettings {
 	return EncodingSettings{

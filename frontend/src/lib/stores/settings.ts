@@ -1,5 +1,5 @@
 import { writable, derived } from 'svelte/store';
-import type { Preset, HWEncoder } from '../types';
+import type { Preset, HWEncoder, QualityLevel } from '../types';
 
 // Available presets
 export const presets = writable<Preset[]>([]);
@@ -15,6 +15,12 @@ export const availableEncoders = writable<HWEncoder[]>([]);
 
 // Selected encoder ID
 export const selectedEncoderID = writable<string>('libx265');
+
+// Quality levels
+export const qualityLevels = writable<QualityLevel[]>([]);
+
+// Selected quality (CRF value)
+export const selectedQuality = writable<number>(22);
 
 // Derived store for selected preset
 export const selectedPreset = derived(
@@ -56,4 +62,12 @@ export function setAvailableEncoders(encoders: HWEncoder[]) {
 
 export function selectEncoder(encoderID: string) {
   selectedEncoderID.set(encoderID);
+}
+
+export function setQualityLevels(levels: QualityLevel[]) {
+  qualityLevels.set(levels);
+}
+
+export function selectQuality(crf: number) {
+  selectedQuality.set(crf);
 }

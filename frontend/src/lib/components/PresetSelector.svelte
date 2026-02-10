@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { presets, selectedPresetName, selectedPreset, availableEncoders, selectedEncoderID, selectedEncoder } from '../stores/settings';
+  import { presets, selectedPresetName, selectedPreset, availableEncoders, selectedEncoderID, selectedEncoder, qualityLevels, selectedQuality } from '../stores/settings';
   import { isEncoding } from '../stores/encoding';
 
   function handlePresetChange(event: Event) {
@@ -12,6 +12,11 @@
     selectedEncoderID.set(target.value);
   }
 
+  function handleQualityChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    selectedQuality.set(Number(target.value));
+  }
+
   function getPresetDescription(preset: typeof $selectedPreset): string {
     if (!preset) return '';
     if (preset.useSourceRes && preset.useSourceFps) {
@@ -19,8 +24,6 @@
     }
     return `${preset.resolution} @ ${preset.framerate}fps → HEVC/MKV`;
   }
-
-
 </script>
 
 <div class="preset-selector">
@@ -52,6 +55,22 @@
             <option value={encoder.id}>
               {encoder.name}
             </option>
+          {/each}
+        </select>
+      </div>
+    {/if}
+
+    {#if $qualityLevels.length > 0}
+      <div class="selector-group quality-group">
+        <label for="quality-select">품질</label>
+        <select
+          id="quality-select"
+          value={$selectedQuality}
+          on:change={handleQualityChange}
+          disabled={$isEncoding}
+        >
+          {#each $qualityLevels as level}
+            <option value={level.value}>{level.label}</option>
           {/each}
         </select>
       </div>
@@ -89,6 +108,11 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .selector-group.quality-group {
+    flex: 0 0 auto;
+    min-width: 100px;
   }
 
   label {

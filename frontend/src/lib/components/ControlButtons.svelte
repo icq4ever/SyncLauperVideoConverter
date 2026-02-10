@@ -2,8 +2,8 @@
   import { createEventDispatcher } from 'svelte';
   import { files, selectedFiles, selectedCount, durationMismatch } from '../stores/files';
   import { isEncoding } from '../stores/encoding';
-  import { selectedPreset, selectedPresetName, selectedEncoderID } from '../stores/settings';
-  import { StartEncoding, CancelEncoding, CheckDurationMismatch, SetEncoder } from '../../../wailsjs/go/main/App';
+  import { selectedPreset, selectedPresetName, selectedEncoderID, selectedQuality } from '../stores/settings';
+  import { StartEncoding, CancelEncoding, CheckDurationMismatch, SetEncoder, SetQuality } from '../../../wailsjs/go/main/App';
   import { startEncoding, stopEncoding } from '../stores/encoding';
 
   const dispatch = createEventDispatcher();
@@ -103,8 +103,9 @@
     showUpscaleDialog = false;
 
     try {
-      // Set the selected encoder before starting
+      // Set the selected encoder and quality before starting
       await SetEncoder($selectedEncoderID);
+      await SetQuality($selectedQuality);
       startEncoding();
       await StartEncoding($selectedPresetName);
     } catch (error) {

@@ -72,3 +72,10 @@ export interface HWEncoder {
   available: boolean;
   priority: number;
 }
+
+// Quality level option
+export interface QualityLevel {
+  name: string;
+  label: string;
+  value: number;
+}
