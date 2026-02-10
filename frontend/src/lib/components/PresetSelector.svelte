@@ -20,15 +20,7 @@
     return `${preset.resolution} @ ${preset.framerate}fps → HEVC/MKV`;
   }
 
-  function getEncoderIcon(encoderId: string): string {
-    if (encoderId === 'libx265') return '💻';
-    if (encoderId.includes('videotoolbox')) return '🍎';
-    if (encoderId.includes('nvenc')) return '🟢';
-    if (encoderId.includes('qsv')) return '🔵';
-    if (encoderId.includes('amf')) return '🔴';
-    if (encoderId.includes('vaapi')) return '🐧';
-    return '⚡';
-  }
+
 </script>
 
 <div class="preset-selector">
@@ -58,7 +50,7 @@
         >
           {#each $availableEncoders as encoder}
             <option value={encoder.id}>
-              {getEncoderIcon(encoder.id)} {encoder.name}
+              {encoder.name}
             </option>
           {/each}
         </select>
@@ -106,9 +98,14 @@
   }
 
   select {
-    padding: 10px 12px;
+    -webkit-appearance: none;
+    appearance: none;
+    padding: 10px 32px 10px 12px;
     font-size: 14px;
     background: var(--bg-secondary, #1a1a1a);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
     border: 1px solid var(--border-color, #444);
     border-radius: 6px;
     color: var(--text-primary, #fff);

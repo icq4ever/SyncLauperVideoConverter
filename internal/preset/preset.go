@@ -244,17 +244,19 @@ func getEncoderArgs(encoderID string, settings EncodingSettings, level string, k
 	switch encoderID {
 	case "hevc_videotoolbox":
 		// Apple VideoToolbox (macOS)
-		// Quality: 0-100 where lower is better quality (similar to CRF concept)
-		// Map CRF 22 to roughly quality 65
-		quality := 40 + settings.Quality
+		// -q:v: 1-100 (lower = better quality). Map CRF 22 → ~50
+		quality := settings.Quality*2 + 6
 		if quality > 100 {
 			quality = 100
+		}
+		if quality < 1 {
+			quality = 1
 		}
 		return []string{
 			"-c:v", "hevc_videotoolbox",
 			"-q:v", fmt.Sprintf("%d", quality),
-			"-profile:v", settings.EncoderProfile,
-			"-tag:v", "hvc1", // For better compatibility
+			"-tag:v", "hvc1",
+			"-allow_sw", "1", // Allow software fallback if HW encoder fails
 		}
 
 	case "hevc_nvenc":
