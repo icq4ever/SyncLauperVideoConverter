@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	goruntime "runtime"
 	"sync"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -13,6 +15,18 @@ import (
 	"syncLauperVideoConverter/internal/fileinfo"
 	"syncLauperVideoConverter/internal/preset"
 )
+
+// openFolderNative opens a folder using the OS file explorer
+func openFolderNative(dir string) error {
+	switch goruntime.GOOS {
+	case "darwin":
+		return exec.Command("open", dir).Start()
+	case "windows":
+		return exec.Command("explorer", dir).Start()
+	default:
+		return exec.Command("xdg-open", dir).Start()
+	}
+}
 
 // App struct
 type App struct {
@@ -34,6 +48,13 @@ func NewApp() *App {
 // startup is called when the app starts
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+
+	// Set default output folder to user's Desktop
+	if a.outputDir == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			a.outputDir = filepath.Join(home, "Desktop", "SyncLauper_Output")
+		}
+	}
 
 	// Set up encoder callbacks
 	a.encoder.SetProgressCallback(func(progress *encoder.EncodingProgress) {
@@ -61,10 +82,6 @@ func (a *App) startup(ctx context.Context) {
 			"failed":    failed,
 		})
 	})
-
-	// Set default output directory to user's Videos folder
-	homeDir, _ := os.UserHomeDir()
-	a.outputDir = filepath.Join(homeDir, "Videos", "SyncLauper")
 }
 
 // GetPresets returns all available presets
@@ -367,6 +384,16 @@ func (a *App) GetSelectedEncoder() string {
 	return a.encoder.GetSelectedEncoder()
 }
 
+// GetQualityLevels returns available quality options
+func (a *App) GetQualityLevels() []preset.QualityLevel {
+	return preset.GetQualityLevels()
+}
+
+// SetQuality sets the encoding quality level (CRF value)
+func (a *App) SetQuality(crf int) {
+	a.encoder.SetQuality(crf)
+}
+
 // OpenFileDialog opens a file selection dialog
 func (a *App) OpenFileDialog() ([]string, error) {
 	files, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
@@ -399,8 +426,7 @@ func (a *App) OpenOutputFolder() error {
 		return err
 	}
 
-	runtime.BrowserOpenURL(a.ctx, "file://"+dir)
-	return nil
+	return openFolderNative(dir)
 }
 
 // GetAppInfo returns application information

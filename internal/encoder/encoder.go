@@ -3,6 +3,7 @@ package encoder
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -37,6 +38,7 @@ type Encoder struct {
 	errorCb         func(err error, job *EncodingJob)
 	allCompleteCb   func(completed int, failed int)
 	selectedEncoder string // Selected encoder ID (e.g., "libx265", "hevc_nvenc")
+	qualityLevel    int    // CRF value (0 = use default)
 }
 
 // NewEncoder creates a new Encoder instance
@@ -107,6 +109,20 @@ func (e *Encoder) GetSelectedEncoder() string {
 	return e.selectedEncoder
 }
 
+// SetQuality sets the quality level (CRF value)
+func (e *Encoder) SetQuality(crf int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.qualityLevel = crf
+}
+
+// GetQuality returns the current quality level
+func (e *Encoder) GetQuality() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.qualityLevel
+}
+
 // AddJob adds a new encoding job to the queue
 func (e *Encoder) AddJob(inputPath string, outputDir string, p *preset.Preset) (*EncodingJob, error) {
 	e.mu.Lock()
@@ -118,9 +134,15 @@ func (e *Encoder) AddJob(inputPath string, outputDir string, p *preset.Preset) (
 		return nil, fmt.Errorf("failed to get file info: %v", err)
 	}
 
-	// Generate output path
+	// Generate output path with auto-rename if file exists
 	baseName := strings.TrimSuffix(filepath.Base(inputPath), filepath.Ext(inputPath))
 	outputPath := filepath.Join(outputDir, baseName+".mkv")
+	for i := 1; ; i++ {
+		if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+			break
+		}
+		outputPath = filepath.Join(outputDir, fmt.Sprintf("%s_%d.mkv", baseName, i))
+	}
 
 	job := &EncodingJob{
 		ID:         fmt.Sprintf("job_%d", len(e.jobs)+1),
@@ -227,7 +249,8 @@ func (e *Encoder) processQueue() {
 			Framerate: job.FileInfo.Framerate,
 		}
 		encoderID := e.GetSelectedEncoder()
-		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID)
+		quality := e.GetQuality()
+		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID, quality)
 
 		// Progress callback wrapper
 		progressWrapper := func(progress *EncodingProgress) {
