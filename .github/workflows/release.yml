@@ -105,13 +105,26 @@ jobs:
       - name: Rename ARM Build
         run: mv build/bin/syncLauperVideoConverter.app build/bin/syncLauperVideoConverter-arm64.app
 
-      - name: Download FFmpeg for macOS
+      - name: Download FFmpeg for macOS (Intel)
         run: |
-          # Download FFmpeg static build for macOS
-          curl -L "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
-          unzip ffmpeg.zip
-          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
-          unzip ffprobe.zip
+          # evermeet.cx provides Intel (x86_64) static builds
+          curl -L "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg-intel.zip
+          unzip -o ffmpeg-intel.zip -d ffmpeg-intel-tmp
+          mv ffmpeg-intel-tmp/ffmpeg ffmpeg-intel || mv ffmpeg ffmpeg-intel
+          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe-intel.zip
+          unzip -o ffprobe-intel.zip -d ffprobe-intel-tmp
+          mv ffprobe-intel-tmp/ffprobe ffprobe-intel || mv ffprobe ffprobe-intel
+          rm -rf ffmpeg-intel-tmp ffprobe-intel-tmp
+
+      - name: Download FFmpeg for macOS (ARM64)
+        run: |
+          # martin-riedl.de provides native ARM64 static builds
+          curl -L "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip" -o ffmpeg-arm64.zip
+          unzip -o ffmpeg-arm64.zip
+          mv ffmpeg ffmpeg-arm64
+          curl -L "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip" -o ffprobe-arm64.zip
+          unzip -o ffprobe-arm64.zip
+          mv ffprobe ffprobe-arm64
 
       - name: Create Release Packages
         run: |
@@ -120,23 +133,23 @@ jobs:
             VERSION="${{ github.event.inputs.version }}"
           fi
 
-          # Intel package
+          # Intel package (with Intel FFmpeg)
           PACKAGE_INTEL="SyncLauperVideoConverter-${VERSION}-macos-intel"
           mkdir -p "${PACKAGE_INTEL}"
           cp -R build/bin/syncLauperVideoConverter-intel.app "${PACKAGE_INTEL}/SyncLauperVideoConverter.app"
-          cp ffmpeg "${PACKAGE_INTEL}/"
-          cp ffprobe "${PACKAGE_INTEL}/"
+          cp ffmpeg-intel "${PACKAGE_INTEL}/ffmpeg"
+          cp ffprobe-intel "${PACKAGE_INTEL}/ffprobe"
           cp LICENSE "${PACKAGE_INTEL}/"
           cp THIRD_PARTY_LICENSES.txt "${PACKAGE_INTEL}/"
           cp README.md "${PACKAGE_INTEL}/"
           zip -r "${PACKAGE_INTEL}.zip" "${PACKAGE_INTEL}"
 
-          # Apple Silicon package
+          # Apple Silicon package (with ARM64 FFmpeg)
           PACKAGE_ARM="SyncLauperVideoConverter-${VERSION}-macos-arm64"
           mkdir -p "${PACKAGE_ARM}"
           cp -R build/bin/syncLauperVideoConverter-arm64.app "${PACKAGE_ARM}/SyncLauperVideoConverter.app"
-          cp ffmpeg "${PACKAGE_ARM}/"
-          cp ffprobe "${PACKAGE_ARM}/"
+          cp ffmpeg-arm64 "${PACKAGE_ARM}/ffmpeg"
+          cp ffprobe-arm64 "${PACKAGE_ARM}/ffprobe"
           cp LICENSE "${PACKAGE_ARM}/"
           cp THIRD_PARTY_LICENSES.txt "${PACKAGE_ARM}/"
           cp README.md "${PACKAGE_ARM}/"
