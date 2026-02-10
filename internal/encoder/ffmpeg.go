@@ -27,13 +27,32 @@ func DefaultFFmpegConfig() FFmpegConfig {
 		execName = "ffmpeg.exe"
 	}
 
-	// First, check if ffmpeg is in the same directory as the executable
 	if exePath, err := os.Executable(); err == nil {
 		exeDir := filepath.Dir(exePath)
+
+		// Check if ffmpeg is in the same directory as the executable
 		localPath := filepath.Join(exeDir, execName)
 		if _, err := os.Stat(localPath); err == nil {
 			return FFmpegConfig{
 				ExecutablePath: localPath,
+			}
+		}
+
+		// On macOS, also check the directory containing the .app bundle
+		// exePath is like: /path/to/App.app/Contents/MacOS/executable
+		// We need to check: /path/to/ffmpeg
+		if runtime.GOOS == "darwin" && strings.Contains(exePath, ".app/Contents/MacOS") {
+			// Navigate up from Contents/MacOS to the .app's parent directory
+			appBundleDir := exeDir // .../App.app/Contents/MacOS
+			for i := 0; i < 3; i++ {
+				appBundleDir = filepath.Dir(appBundleDir)
+			}
+			// appBundleDir is now the directory containing the .app
+			bundlePath := filepath.Join(appBundleDir, execName)
+			if _, err := os.Stat(bundlePath); err == nil {
+				return FFmpegConfig{
+					ExecutablePath: bundlePath,
+				}
 			}
 		}
 	}
