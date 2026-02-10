@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { EventsOn } from '../wailsjs/runtime/runtime';
-  import { GetPresets, GetOutputFolder, GetFiles, CheckFFmpeg, GetAppInfo } from '../wailsjs/go/main/App';
+  import { GetPresets, GetOutputFolder, GetFiles, CheckFFmpeg, GetAppInfo, GetAvailableEncoders } from '../wailsjs/go/main/App';
 
   import DropZone from './lib/components/DropZone.svelte';
   import FileList from './lib/components/FileList.svelte';
@@ -12,7 +12,7 @@
   import ControlButtons from './lib/components/ControlButtons.svelte';
 
   import { files, durationMismatch, clearFiles } from './lib/stores/files';
-  import { setPresets, setOutputFolder } from './lib/stores/settings';
+  import { setPresets, setOutputFolder, setAvailableEncoders } from './lib/stores/settings';
   import { isEncoding, updateProgress, fileCompleted, fileError, stopEncoding } from './lib/stores/encoding';
 
   import type { EncodingProgress, DurationCheckResult, EncodingStatus } from './lib/types';
@@ -35,6 +35,14 @@
       setPresets(presets);
     } catch (error) {
       console.error('Failed to load presets:', error);
+    }
+
+    // Load available encoders
+    try {
+      const encoders = await GetAvailableEncoders();
+      setAvailableEncoders(encoders);
+    } catch (error) {
+      console.error('Failed to load encoders:', error);
     }
 
     // Load output folder

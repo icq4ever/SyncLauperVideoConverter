@@ -63,3 +63,12 @@ export interface AppInfo {
   appVersion: string;
   ffmpegVersion: string;
 }
+
+// Hardware encoder information
+export interface HWEncoder {
+  id: string;
+  name: string;
+  description: string;
+  available: boolean;
+  priority: number;
+}

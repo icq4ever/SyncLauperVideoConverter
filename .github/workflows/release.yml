@@ -1,0 +1,214 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+
+env:
+  GO_VERSION: '1.23'
+  NODE_VERSION: '20'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build Windows
+        run: wails build -platform windows/amd64
+
+      - name: Download FFmpeg Essentials
+        shell: pwsh
+        run: |
+          $ffmpegUrl = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+          $ffmpegZip = "ffmpeg-essentials.zip"
+          Invoke-WebRequest -Uri $ffmpegUrl -OutFile $ffmpegZip
+          Expand-Archive -Path $ffmpegZip -DestinationPath ffmpeg-temp
+          $ffmpegDir = Get-ChildItem -Path ffmpeg-temp -Directory | Select-Object -First 1
+          Copy-Item "$($ffmpegDir.FullName)\bin\ffmpeg.exe" -Destination "build\bin\"
+          Copy-Item "$($ffmpegDir.FullName)\bin\ffprobe.exe" -Destination "build\bin\"
+
+      - name: Create Release Package
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $version = "${{ github.event.inputs.version }}"
+          }
+          $packageName = "SyncLauperVideoConverter-${version}-windows-amd64"
+          New-Item -ItemType Directory -Path $packageName -Force
+          Copy-Item "build\bin\syncLauperVideoConverter.exe" -Destination $packageName
+          Copy-Item "build\bin\ffmpeg.exe" -Destination $packageName
+          Copy-Item "build\bin\ffprobe.exe" -Destination $packageName
+          Copy-Item "LICENSE" -Destination $packageName
+          Copy-Item "THIRD_PARTY_LICENSES.txt" -Destination $packageName
+          Copy-Item "README.md" -Destination $packageName
+          Compress-Archive -Path $packageName -DestinationPath "${packageName}.zip"
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: SyncLauperVideoConverter-*-windows-amd64.zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build macOS (Intel)
+        run: wails build -platform darwin/amd64
+
+      - name: Rename Intel Build
+        run: mv build/bin/syncLauperVideoConverter.app build/bin/syncLauperVideoConverter-intel.app
+
+      - name: Build macOS (Apple Silicon)
+        run: wails build -platform darwin/arm64
+
+      - name: Rename ARM Build
+        run: mv build/bin/syncLauperVideoConverter.app build/bin/syncLauperVideoConverter-arm64.app
+
+      - name: Download FFmpeg for macOS
+        run: |
+          # Download FFmpeg static build for macOS
+          curl -L "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg.zip
+          unzip ffmpeg.zip
+          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe.zip
+          unzip ffprobe.zip
+
+      - name: Create Release Packages
+        run: |
+          VERSION="${{ github.ref_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+
+          # Intel package
+          PACKAGE_INTEL="SyncLauperVideoConverter-${VERSION}-macos-intel"
+          mkdir -p "${PACKAGE_INTEL}"
+          cp -R build/bin/syncLauperVideoConverter-intel.app "${PACKAGE_INTEL}/SyncLauperVideoConverter.app"
+          cp ffmpeg "${PACKAGE_INTEL}/"
+          cp ffprobe "${PACKAGE_INTEL}/"
+          cp LICENSE "${PACKAGE_INTEL}/"
+          cp THIRD_PARTY_LICENSES.txt "${PACKAGE_INTEL}/"
+          cp README.md "${PACKAGE_INTEL}/"
+          zip -r "${PACKAGE_INTEL}.zip" "${PACKAGE_INTEL}"
+
+          # Apple Silicon package
+          PACKAGE_ARM="SyncLauperVideoConverter-${VERSION}-macos-arm64"
+          mkdir -p "${PACKAGE_ARM}"
+          cp -R build/bin/syncLauperVideoConverter-arm64.app "${PACKAGE_ARM}/SyncLauperVideoConverter.app"
+          cp ffmpeg "${PACKAGE_ARM}/"
+          cp ffprobe "${PACKAGE_ARM}/"
+          cp LICENSE "${PACKAGE_ARM}/"
+          cp THIRD_PARTY_LICENSES.txt "${PACKAGE_ARM}/"
+          cp README.md "${PACKAGE_ARM}/"
+          zip -r "${PACKAGE_ARM}.zip" "${PACKAGE_ARM}"
+
+      - name: Upload macOS Intel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-intel-build
+          path: SyncLauperVideoConverter-*-macos-intel.zip
+
+      - name: Upload macOS ARM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-build
+          path: SyncLauperVideoConverter-*-macos-arm64.zip
+
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: SyncLauper VideoConverter ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**/*.zip
+          body: |
+            ## SyncLauper VideoConverter ${{ steps.version.outputs.VERSION }}
+
+            SyncLauper 동기화 재생에 최적화된 HEVC 영상 변환 도구입니다.
+
+            ### 다운로드
+
+            | 플랫폼 | 파일 |
+            |--------|------|
+            | Windows (64-bit) | `SyncLauperVideoConverter-${{ steps.version.outputs.VERSION }}-windows-amd64.zip` |
+            | macOS (Intel) | `SyncLauperVideoConverter-${{ steps.version.outputs.VERSION }}-macos-intel.zip` |
+            | macOS (Apple Silicon) | `SyncLauperVideoConverter-${{ steps.version.outputs.VERSION }}-macos-arm64.zip` |
+
+            ### 설치 방법
+
+            1. 해당 플랫폼의 zip 파일을 다운로드합니다
+            2. 압축을 해제합니다
+            3. **FFmpeg가 포함되어 있습니다** - 별도 설치 불필요
+            4. 프로그램을 실행합니다
+
+            ### 주요 기능
+
+            - HEVC (H.265) 인코딩
+            - 하드웨어 가속 인코딩 지원 (자동 감지)
+              - macOS: Apple VideoToolbox
+              - Windows: NVIDIA NVENC, Intel QuickSync, AMD AMF
+            - SyncLauper 동기화 재생에 최적화된 프리셋
+            - 일괄 변환 지원
+
+            ---
+            Built with [Wails](https://wails.io)

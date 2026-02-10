@@ -352,6 +352,21 @@ func (a *App) GetFFmpegVersion() (string, error) {
 	return a.encoder.GetFFmpegVersion()
 }
 
+// GetAvailableEncoders returns all available HEVC encoders
+func (a *App) GetAvailableEncoders() []encoder.HWEncoder {
+	return a.encoder.GetAvailableEncoders()
+}
+
+// SetEncoder sets the encoder to use for encoding
+func (a *App) SetEncoder(encoderID string) {
+	a.encoder.SetEncoder(encoderID)
+}
+
+// GetSelectedEncoder returns the currently selected encoder
+func (a *App) GetSelectedEncoder() string {
+	return a.encoder.GetSelectedEncoder()
+}
+
 // OpenFileDialog opens a file selection dialog
 func (a *App) OpenFileDialog() ([]string, error) {
 	files, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{

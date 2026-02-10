@@ -25,17 +25,18 @@ type EncodingJob struct {
 
 // Encoder manages encoding jobs
 type Encoder struct {
-	ffmpeg        *FFmpeg
-	jobs          []*EncodingJob
-	currentJob    int
-	isRunning     bool
-	cancelFunc    context.CancelFunc
-	cancelCtx     context.Context
-	mu            sync.RWMutex
-	progressCb    func(progress *EncodingProgress)
-	completeCb    func(result *EncodeResult, job *EncodingJob)
-	errorCb       func(err error, job *EncodingJob)
-	allCompleteCb func(completed int, failed int)
+	ffmpeg          *FFmpeg
+	jobs            []*EncodingJob
+	currentJob      int
+	isRunning       bool
+	cancelFunc      context.CancelFunc
+	cancelCtx       context.Context
+	mu              sync.RWMutex
+	progressCb      func(progress *EncodingProgress)
+	completeCb      func(result *EncodeResult, job *EncodingJob)
+	errorCb         func(err error, job *EncodingJob)
+	allCompleteCb   func(completed int, failed int)
+	selectedEncoder string // Selected encoder ID (e.g., "libx265", "hevc_nvenc")
 }
 
 // NewEncoder creates a new Encoder instance
@@ -82,6 +83,28 @@ func (e *Encoder) CheckFFmpeg() error {
 // GetFFmpegVersion returns the FFmpeg version
 func (e *Encoder) GetFFmpegVersion() (string, error) {
 	return e.ffmpeg.GetVersion()
+}
+
+// GetAvailableEncoders returns all available HEVC encoders
+func (e *Encoder) GetAvailableEncoders() []HWEncoder {
+	return e.ffmpeg.GetAvailableHWEncoders()
+}
+
+// SetEncoder sets the encoder to use
+func (e *Encoder) SetEncoder(encoderID string) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.selectedEncoder = encoderID
+}
+
+// GetSelectedEncoder returns the currently selected encoder
+func (e *Encoder) GetSelectedEncoder() string {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	if e.selectedEncoder == "" {
+		return "libx265" // Default to software
+	}
+	return e.selectedEncoder
 }
 
 // AddJob adds a new encoding job to the queue
@@ -197,13 +220,14 @@ func (e *Encoder) processQueue() {
 		job.Status = StatusEncoding
 		e.mu.Unlock()
 
-		// Build FFmpeg arguments
+		// Build FFmpeg arguments with selected encoder
 		sourceInfo := &preset.FileInfo{
 			Width:     job.FileInfo.Width,
 			Height:    job.FileInfo.Height,
 			Framerate: job.FileInfo.Framerate,
 		}
-		args := job.Preset.ToFFmpegArgs(job.InputPath, job.OutputPath, sourceInfo)
+		encoderID := e.GetSelectedEncoder()
+		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID)
 
 		// Progress callback wrapper
 		progressWrapper := func(progress *EncodingProgress) {

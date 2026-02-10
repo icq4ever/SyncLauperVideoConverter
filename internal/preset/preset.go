@@ -144,6 +144,11 @@ func DetermineLevel(width, height int, fps float64) string {
 
 // ToFFmpegArgs converts a preset to FFmpeg arguments
 func (p *Preset) ToFFmpegArgs(inputPath, outputPath string, sourceInfo *FileInfo) []string {
+	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265")
+}
+
+// ToFFmpegArgsWithEncoder converts a preset to FFmpeg arguments with specified encoder
+func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string) []string {
 	settings := DefaultSettings()
 
 	// Determine effective values for source-based preset
@@ -166,28 +171,18 @@ func (p *Preset) ToFFmpegArgs(inputPath, outputPath string, sourceInfo *FileInfo
 		effectiveLevel = DetermineLevel(effectiveWidth, effectiveHeight, effectiveFPS)
 	}
 
-	// Build x265 params
+	// Build keyint for GOP settings
 	keyint := int(math.Round(effectiveFPS))
 	if keyint <= 0 {
 		keyint = 30 // fallback
 	}
 
-	x265Params := fmt.Sprintf(
-		"keyint=%d:min-keyint=%d:open-gop=0:scenecut=0:repeat-headers=1:ref=4:bframes=3:hrd=1",
-		keyint, keyint,
-	)
-
 	args := []string{
 		"-i", inputPath,
-		// Video codec
-		"-c:v", "libx265",
-		"-crf", fmt.Sprintf("%d", settings.Quality),
-		"-preset", settings.EncoderPreset,
-		"-tune", settings.EncoderTune,
-		"-profile:v", settings.EncoderProfile,
-		"-level:v", effectiveLevel,
-		"-x265-params", x265Params,
 	}
+
+	// Add encoder-specific video codec options
+	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint)...)
 
 	// Add resolution if not using source
 	if !p.UseSourceRes && p.Width > 0 && p.Height > 0 {
@@ -242,4 +237,136 @@ func (p *Preset) GetPresetInfo() string {
 		return "원본 해상도 및 프레임레이트 유지, HEVC 인코딩"
 	}
 	return fmt.Sprintf("%s @ %sfps, HEVC 인코딩", p.Resolution, p.Framerate)
+}
+
+// getEncoderArgs returns encoder-specific FFmpeg arguments
+func getEncoderArgs(encoderID string, settings EncodingSettings, level string, keyint int) []string {
+	switch encoderID {
+	case "hevc_videotoolbox":
+		// Apple VideoToolbox (macOS)
+		// Quality: 0-100 where lower is better quality (similar to CRF concept)
+		// Map CRF 22 to roughly quality 65
+		quality := 40 + settings.Quality
+		if quality > 100 {
+			quality = 100
+		}
+		return []string{
+			"-c:v", "hevc_videotoolbox",
+			"-q:v", fmt.Sprintf("%d", quality),
+			"-profile:v", settings.EncoderProfile,
+			"-tag:v", "hvc1", // For better compatibility
+		}
+
+	case "hevc_nvenc":
+		// NVIDIA NVENC
+		// CQ mode with quality value (0-51, lower is better)
+		return []string{
+			"-c:v", "hevc_nvenc",
+			"-rc", "vbr",
+			"-cq", fmt.Sprintf("%d", settings.Quality),
+			"-preset", mapNvencPreset(settings.EncoderPreset),
+			"-profile:v", settings.EncoderProfile,
+			"-level:v", level,
+			"-g", fmt.Sprintf("%d", keyint),
+			"-bf", "3",
+		}
+
+	case "hevc_qsv":
+		// Intel QuickSync
+		return []string{
+			"-c:v", "hevc_qsv",
+			"-global_quality", fmt.Sprintf("%d", settings.Quality),
+			"-preset", mapQsvPreset(settings.EncoderPreset),
+			"-profile:v", settings.EncoderProfile,
+			"-level:v", level,
+			"-g", fmt.Sprintf("%d", keyint),
+		}
+
+	case "hevc_amf":
+		// AMD AMF
+		return []string{
+			"-c:v", "hevc_amf",
+			"-rc", "cqp",
+			"-qp_i", fmt.Sprintf("%d", settings.Quality),
+			"-qp_p", fmt.Sprintf("%d", settings.Quality),
+			"-quality", mapAmfQuality(settings.EncoderPreset),
+			"-profile:v", settings.EncoderProfile,
+			"-level:v", level,
+			"-gops_per_idr", "1",
+		}
+
+	case "hevc_vaapi":
+		// Linux VAAPI
+		return []string{
+			"-c:v", "hevc_vaapi",
+			"-qp", fmt.Sprintf("%d", settings.Quality),
+			"-profile:v", settings.EncoderProfile,
+			"-level:v", level,
+			"-g", fmt.Sprintf("%d", keyint),
+		}
+
+	default:
+		// libx265 (software)
+		x265Params := fmt.Sprintf(
+			"keyint=%d:min-keyint=%d:open-gop=0:scenecut=0:repeat-headers=1:ref=4:bframes=3:hrd=1",
+			keyint, keyint,
+		)
+		return []string{
+			"-c:v", "libx265",
+			"-crf", fmt.Sprintf("%d", settings.Quality),
+			"-preset", settings.EncoderPreset,
+			"-tune", settings.EncoderTune,
+			"-profile:v", settings.EncoderProfile,
+			"-level:v", level,
+			"-x265-params", x265Params,
+		}
+	}
+}
+
+// mapNvencPreset maps x265 preset names to NVENC preset names
+func mapNvencPreset(preset string) string {
+	switch preset {
+	case "ultrafast", "superfast", "veryfast":
+		return "p1"
+	case "faster", "fast":
+		return "p4"
+	case "medium":
+		return "p5"
+	case "slow":
+		return "p6"
+	case "slower", "veryslow":
+		return "p7"
+	default:
+		return "p4"
+	}
+}
+
+// mapQsvPreset maps x265 preset names to QSV preset names
+func mapQsvPreset(preset string) string {
+	switch preset {
+	case "ultrafast", "superfast", "veryfast":
+		return "veryfast"
+	case "faster", "fast":
+		return "fast"
+	case "medium":
+		return "medium"
+	case "slow", "slower", "veryslow":
+		return "slow"
+	default:
+		return "fast"
+	}
+}
+
+// mapAmfQuality maps x265 preset to AMF quality
+func mapAmfQuality(preset string) string {
+	switch preset {
+	case "ultrafast", "superfast", "veryfast", "faster", "fast":
+		return "speed"
+	case "medium":
+		return "balanced"
+	case "slow", "slower", "veryslow":
+		return "quality"
+	default:
+		return "balanced"
+	}
 }

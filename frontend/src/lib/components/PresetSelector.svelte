@@ -1,10 +1,15 @@
 <script lang="ts">
-  import { presets, selectedPresetName, selectedPreset } from '../stores/settings';
+  import { presets, selectedPresetName, selectedPreset, availableEncoders, selectedEncoderID, selectedEncoder } from '../stores/settings';
   import { isEncoding } from '../stores/encoding';
 
-  function handleChange(event: Event) {
+  function handlePresetChange(event: Event) {
     const target = event.target as HTMLSelectElement;
     selectedPresetName.set(target.value);
+  }
+
+  function handleEncoderChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    selectedEncoderID.set(target.value);
   }
 
   function getPresetDescription(preset: typeof $selectedPreset): string {
@@ -14,25 +19,65 @@
     }
     return `${preset.resolution} @ ${preset.framerate}fps → HEVC/MKV`;
   }
+
+  function getEncoderIcon(encoderId: string): string {
+    if (encoderId === 'libx265') return '💻';
+    if (encoderId.includes('videotoolbox')) return '🍎';
+    if (encoderId.includes('nvenc')) return '🟢';
+    if (encoderId.includes('qsv')) return '🔵';
+    if (encoderId.includes('amf')) return '🔴';
+    if (encoderId.includes('vaapi')) return '🐧';
+    return '⚡';
+  }
 </script>
 
 <div class="preset-selector">
-  <label for="preset-select">프리셋</label>
-  <select
-    id="preset-select"
-    value={$selectedPresetName}
-    on:change={handleChange}
-    disabled={$isEncoding}
-  >
-    {#each $presets as preset}
-      <option value={preset.name}>{preset.name}</option>
-    {/each}
-  </select>
-  {#if $selectedPreset}
-    <div class="preset-info">
-      {getPresetDescription($selectedPreset)}
+  <div class="selector-row">
+    <div class="selector-group">
+      <label for="preset-select">프리셋</label>
+      <select
+        id="preset-select"
+        value={$selectedPresetName}
+        on:change={handlePresetChange}
+        disabled={$isEncoding}
+      >
+        {#each $presets as preset}
+          <option value={preset.name}>{preset.name}</option>
+        {/each}
+      </select>
     </div>
-  {/if}
+
+    {#if $availableEncoders.length > 0}
+      <div class="selector-group">
+        <label for="encoder-select">인코더</label>
+        <select
+          id="encoder-select"
+          value={$selectedEncoderID}
+          on:change={handleEncoderChange}
+          disabled={$isEncoding}
+        >
+          {#each $availableEncoders as encoder}
+            <option value={encoder.id}>
+              {getEncoderIcon(encoder.id)} {encoder.name}
+            </option>
+          {/each}
+        </select>
+      </div>
+    {/if}
+  </div>
+
+  <div class="info-row">
+    {#if $selectedPreset}
+      <div class="preset-info">
+        {getPresetDescription($selectedPreset)}
+      </div>
+    {/if}
+    {#if $selectedEncoder}
+      <div class="encoder-info" class:hardware={$selectedEncoder.id !== 'libx265'}>
+        {$selectedEncoder.description}
+      </div>
+    {/if}
+  </div>
 </div>
 
 <style>
@@ -40,6 +85,18 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .selector-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .selector-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
   }
 
   label {
@@ -73,11 +130,23 @@
     cursor: not-allowed;
   }
 
-  .preset-info {
+  .info-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .preset-info,
+  .encoder-info {
+    flex: 1;
     font-size: 12px;
     color: var(--text-secondary, #888);
     padding: 8px 12px;
     background: var(--bg-tertiary, #222);
     border-radius: 4px;
+  }
+
+  .encoder-info.hardware {
+    background: linear-gradient(135deg, #1a2a1a 0%, #222 100%);
+    border-left: 2px solid #4a9;
   }
 </style>
