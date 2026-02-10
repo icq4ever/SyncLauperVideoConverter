@@ -241,8 +241,10 @@ jobs:
             - 하드웨어 가속 인코딩 지원 (자동 감지)
               - macOS: Apple VideoToolbox
               - Windows: NVIDIA NVENC, Intel QuickSync, AMD AMF
+            - 화질 선택 (일반 / 고품질 / 최고품질)
             - SyncLauper 동기화 재생에 최적화된 프리셋
             - 일괄 변환 지원
+            - 출력 파일 중복 시 자동 이름 변경
 
             ---
             Built with [Wails](https://wails.io)
