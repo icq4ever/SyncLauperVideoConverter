@@ -107,24 +107,33 @@ jobs:
 
       - name: Download FFmpeg for macOS (Intel)
         run: |
+          set -e
           # evermeet.cx provides Intel (x86_64) static builds
-          curl -L "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg-intel.zip
+          curl -fL "https://evermeet.cx/ffmpeg/getrelease/zip" -o ffmpeg-intel.zip
           unzip -o ffmpeg-intel.zip -d ffmpeg-intel-tmp
-          mv ffmpeg-intel-tmp/ffmpeg ffmpeg-intel || mv ffmpeg ffmpeg-intel
-          curl -L "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe-intel.zip
+          find ffmpeg-intel-tmp -name "ffmpeg" -type f | head -1 | xargs -I{} mv {} ffmpeg-intel
+          curl -fL "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip" -o ffprobe-intel.zip
           unzip -o ffprobe-intel.zip -d ffprobe-intel-tmp
-          mv ffprobe-intel-tmp/ffprobe ffprobe-intel || mv ffprobe ffprobe-intel
+          find ffprobe-intel-tmp -name "ffprobe" -type f | head -1 | xargs -I{} mv {} ffprobe-intel
           rm -rf ffmpeg-intel-tmp ffprobe-intel-tmp
+          # Verify Intel architecture
+          file ffmpeg-intel
+          file ffprobe-intel
 
       - name: Download FFmpeg for macOS (ARM64)
         run: |
+          set -e
           # martin-riedl.de provides native ARM64 static builds
-          curl -L "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip" -o ffmpeg-arm64.zip
-          unzip -o ffmpeg-arm64.zip
-          mv ffmpeg ffmpeg-arm64
-          curl -L "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip" -o ffprobe-arm64.zip
-          unzip -o ffprobe-arm64.zip
-          mv ffprobe ffprobe-arm64
+          curl -fL "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffmpeg.zip" -o ffmpeg-arm64.zip
+          unzip -o ffmpeg-arm64.zip -d ffmpeg-arm64-tmp
+          find ffmpeg-arm64-tmp -name "ffmpeg" -type f | head -1 | xargs -I{} mv {} ffmpeg-arm64
+          curl -fL "https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/ffprobe.zip" -o ffprobe-arm64.zip
+          unzip -o ffprobe-arm64.zip -d ffprobe-arm64-tmp
+          find ffprobe-arm64-tmp -name "ffprobe" -type f | head -1 | xargs -I{} mv {} ffprobe-arm64
+          rm -rf ffmpeg-arm64-tmp ffprobe-arm64-tmp
+          # Verify ARM64 architecture
+          file ffmpeg-arm64
+          file ffprobe-arm64
 
       - name: Create Release Packages
         run: |
@@ -178,6 +187,9 @@ jobs:
         with:
           path: artifacts
 
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Get version
         id: version
         run: |
@@ -187,13 +199,20 @@ jobs:
             echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Delete existing release
+        run: |
+          gh release delete "${{ steps.version.outputs.VERSION }}" --yes --cleanup-tag 2>/dev/null || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.VERSION }}
           name: SyncLauper VideoConverter ${{ steps.version.outputs.VERSION }}
           draft: false
           prerelease: false
+          make_latest: "true"
           files: |
             artifacts/**/*.zip
           body: |
