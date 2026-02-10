@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentProgress, completedCount, errorCount } from '../stores/encoding';
+  import { currentProgress, completedCount, errorCount, errorFiles } from '../stores/encoding';
   import { totalCount } from '../stores/files';
 
   $: overallProgress = $totalCount > 0
@@ -64,6 +64,18 @@
         <span class="errors">오류: {$errorCount}</span>
       {/if}
     </div>
+
+    <!-- Error details -->
+    {#if $errorFiles.length > 0}
+      <div class="error-details">
+        {#each $errorFiles as err}
+          <div class="error-item">
+            <span class="error-filename">{err.filename}</span>
+            <pre class="error-message">{err.error}</pre>
+          </div>
+        {/each}
+      </div>
+    {/if}
   {:else}
     <div class="idle-state">
       인코딩 대기 중...
@@ -189,5 +201,37 @@
     padding: 20px;
     color: var(--text-secondary, #888);
     font-size: 14px;
+  }
+
+  .error-details {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #333);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .error-item {
+    background: rgba(217, 83, 79, 0.1);
+    border: 1px solid rgba(217, 83, 79, 0.3);
+    border-radius: 4px;
+    padding: 8px 10px;
+  }
+
+  .error-filename {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--error-color, #d9534f);
+  }
+
+  .error-message {
+    font-size: 11px;
+    color: var(--text-secondary, #aaa);
+    margin: 4px 0 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 80px;
+    overflow-y: auto;
   }
 </style>

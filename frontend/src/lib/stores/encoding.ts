@@ -23,6 +23,7 @@ export const isEncoding = derived(encodingState, $state => $state.isEncoding);
 export const currentProgress = derived(encodingState, $state => $state.currentProgress);
 export const completedCount = derived(encodingState, $state => $state.completedFiles.length);
 export const errorCount = derived(encodingState, $state => $state.errorFiles.length);
+export const errorFiles = derived(encodingState, $state => $state.errorFiles);
 
 // Helper functions
 export function startEncoding() {
