@@ -59,8 +59,10 @@ Automatically detects available hardware encoders for faster encoding.
 SyncLauperVideoConverter/
 ├── syncLauperVideoConverter.exe
 ├── ffmpeg.exe
-└── ffprobe.exe
+└── ffprobe.exe (optional)
 ```
+
+> **Note**: ffprobe is only needed for fallback analysis of formats like WMV/FLV/TS. MP4/MOV/MKV/WebM/AVI use native parsers and work without ffprobe.
 
 ### macOS
 
@@ -75,7 +77,7 @@ SyncLauperVideoConverter/
 SyncLauperVideoConverter/
 ├── SyncLauperVideoConverter.app
 ├── ffmpeg
-└── ffprobe
+└── ffprobe (optional)
 ```
 
 ## Building from Source
@@ -124,7 +126,7 @@ wails dev
 - **Windows**: `build/bin/syncLauperVideoConverter.exe`
 - **macOS**: `build/bin/syncLauperVideoConverter.app`
 
-> **Note**: For distribution, place `ffmpeg` and `ffprobe` in the same folder as the build output.
+> **Note**: For distribution, `ffmpeg` is required. `ffprobe` is optional (only for non-standard format support).
 
 ## Tech Stack
 

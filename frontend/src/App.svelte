@@ -26,7 +26,7 @@
     try {
       await CheckFFmpeg();
     } catch (error) {
-      ffmpegError = 'FFmpeg를 찾을 수 없습니다. ffmpeg.exe를 프로그램 폴더에 넣거나 PATH에 추가해주세요.';
+      ffmpegError = 'FFmpeg를 찾을 수 없습니다. ffmpeg를 프로그램 폴더에 넣거나 PATH에 추가해주세요.';
     }
 
     // Load presets

@@ -59,8 +59,10 @@
 SyncLauperVideoConverter/
 ├── syncLauperVideoConverter.exe
 ├── ffmpeg.exe
-└── ffprobe.exe
+└── ffprobe.exe (선택사항)
 ```
+
+> **참고**: ffprobe는 WMV/FLV/TS 등 일부 형식의 폴백 분석용입니다. MP4/MOV/MKV/WebM/AVI는 네이티브 파서를 사용하므로 ffprobe 없이도 작동합니다.
 
 ### macOS
 
@@ -75,7 +77,7 @@ SyncLauperVideoConverter/
 SyncLauperVideoConverter/
 ├── SyncLauperVideoConverter.app
 ├── ffmpeg
-└── ffprobe
+└── ffprobe (선택사항)
 ```
 
 ## 소스에서 빌드하기
@@ -124,7 +126,7 @@ wails dev
 - **Windows**: `build/bin/syncLauperVideoConverter.exe`
 - **macOS**: `build/bin/syncLauperVideoConverter.app`
 
-> **참고**: 배포 시에는 `ffmpeg`와 `ffprobe`를 빌드 결과물과 같은 폴더에 배치해야 합니다.
+> **참고**: 배포 시 `ffmpeg`는 필수이며, `ffprobe`는 선택사항입니다 (일부 비표준 형식 지원용).
 
 ## 기술 스택
 
