@@ -2,7 +2,7 @@
 
 이 프로젝트의 주요 변경 사항을 기록합니다.
 
-## [1.1.0] - 2025-02-10
+## [1.1.0] - 2025-02-11
 
 ### 추가
 
@@ -14,12 +14,22 @@
 - **인코더 선택 UI** - 사용 가능한 인코더 중 선택 가능한 드롭다운 추가
 - **GitHub Actions 워크플로우** - Windows 및 macOS (Intel + Apple Silicon) 자동 빌드
 - **FFmpeg 번들링** - 릴리스 패키지에 FFmpeg essentials 포함
+- **인코딩 에러 상세 표시** - 인코딩 실패 시 FFmpeg 에러 메시지를 UI에 표시
+
+### 수정
+
+- macOS `.app` 번들에서 같은 폴더의 ffmpeg/ffprobe를 찾지 못하는 문제
+- VideoToolbox (macOS)에서 `-profile:v` 파라미터로 인해 0KB 파일이 생성되는 문제
+- macOS에서 FFmpeg 에러 메시지가 `ffmpeg.exe`로 표시되는 문제
 
 ### 변경
 
 - README에 macOS 설치 방법 추가
 - README에 하드웨어 인코딩 관련 문서 추가
 - 모든 플랫폼 빌드 방법 업데이트
+- ffprobe는 선택사항임을 명시 (WMV/FLV/TS 폴백용으로만 필요)
+- 인코더 드롭다운에서 이모지 아이콘 제거
+- macOS 네이티브 그라데이션 대신 커스텀 드롭다운 스타일 적용
 
 ## [1.0.0] - 2025-02-09
 
