@@ -144,12 +144,15 @@ func DetermineLevel(width, height int, fps float64) string {
 
 // ToFFmpegArgs converts a preset to FFmpeg arguments
 func (p *Preset) ToFFmpegArgs(inputPath, outputPath string, sourceInfo *FileInfo) []string {
-	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265")
+	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265", 0)
 }
 
 // ToFFmpegArgsWithEncoder converts a preset to FFmpeg arguments with specified encoder
-func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string) []string {
+func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string, quality int) []string {
 	settings := DefaultSettings()
+	if quality > 0 {
+		settings.Quality = quality
+	}
 
 	// Determine effective values for source-based preset
 	effectiveWidth := p.Width
@@ -182,7 +185,7 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 	}
 
 	// Add encoder-specific video codec options
-	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint)...)
+	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint, effectiveWidth, effectiveHeight)...)
 
 	// Add resolution if not using source
 	if !p.UseSourceRes && p.Width > 0 && p.Height > 0 {
@@ -240,23 +243,31 @@ func (p *Preset) GetPresetInfo() string {
 }
 
 // getEncoderArgs returns encoder-specific FFmpeg arguments
-func getEncoderArgs(encoderID string, settings EncodingSettings, level string, keyint int) []string {
+func getEncoderArgs(encoderID string, settings EncodingSettings, level string, keyint int, width int, height int) []string {
 	switch encoderID {
 	case "hevc_videotoolbox":
 		// Apple VideoToolbox (macOS)
-		// -q:v: 1-100 (lower = better quality). Map CRF 22 → ~50
-		quality := settings.Quality*2 + 6
-		if quality > 100 {
-			quality = 100
+		// Calculate bitrate based on resolution to match libx265 CRF quality
+		// Base: ~3 Mbps for 1080p, scales linearly with pixel count
+		pixels := width * height
+		if pixels == 0 {
+			pixels = 1920 * 1080 // default to 1080p
 		}
-		if quality < 1 {
-			quality = 1
+		baseBitrateK := float64(pixels) / float64(1920*1080) * 3000
+		// Quality adjustment: each CRF point changes bitrate by ~12%
+		qualityFactor := math.Pow(1.12, float64(22-settings.Quality))
+		bitrateK := int(baseBitrateK * qualityFactor)
+		if bitrateK < 500 {
+			bitrateK = 500
+		}
+		if bitrateK > 50000 {
+			bitrateK = 50000
 		}
 		return []string{
 			"-c:v", "hevc_videotoolbox",
-			"-q:v", fmt.Sprintf("%d", quality),
+			"-b:v", fmt.Sprintf("%dk", bitrateK),
 			"-tag:v", "hvc1",
-			"-allow_sw", "1", // Allow software fallback if HW encoder fails
+			"-allow_sw", "1",
 		}
 
 	case "hevc_nvenc":

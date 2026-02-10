@@ -65,20 +65,21 @@
       {/if}
     </div>
 
-    <!-- Error details -->
-    {#if $errorFiles.length > 0}
-      <div class="error-details">
-        {#each $errorFiles as err}
-          <div class="error-item">
-            <span class="error-filename">{err.filename}</span>
-            <pre class="error-message">{err.error}</pre>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  {:else}
+  {:else if $errorFiles.length === 0}
     <div class="idle-state">
       인코딩 대기 중...
+    </div>
+  {/if}
+
+  <!-- Error details (always visible regardless of progress state) -->
+  {#if $errorFiles.length > 0}
+    <div class="error-details">
+      {#each $errorFiles as err}
+        <div class="error-item">
+          <span class="error-filename">{err.filename}</span>
+          <pre class="error-message">{err.error}</pre>
+        </div>
+      {/each}
     </div>
   {/if}
 </div>

@@ -127,6 +127,8 @@ func (f *FFmpeg) Encode(ctx context.Context, args []string, durationSecs float64
 	fullArgs = append(fullArgs, "-progress", "pipe:1")
 	fullArgs = append(fullArgs, args...)
 
+	fmt.Printf("[FFmpeg] %s %s\n", f.config.ExecutablePath, strings.Join(fullArgs, " "))
+
 	cmd := exec.CommandContext(ctx, f.config.ExecutablePath, fullArgs...)
 	cmdutil.HideWindow(cmd)
 
@@ -226,12 +228,13 @@ func (f *FFmpeg) Encode(ctx context.Context, args []string, durationSecs float64
 		if stderrOutput.Len() > 0 {
 			// Get last few lines of stderr for the error message
 			lines := strings.Split(stderrOutput.String(), "\n")
-			start := len(lines) - 5
+			start := len(lines) - 10
 			if start < 0 {
 				start = 0
 			}
 			errMsg = strings.Join(lines[start:], "\n")
 		}
+		fmt.Printf("[FFmpeg Error] %s\n", errMsg)
 		return &EncodeResult{
 			Success: false,
 			Error:   errMsg,
