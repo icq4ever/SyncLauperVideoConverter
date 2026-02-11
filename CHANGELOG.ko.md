@@ -2,6 +2,14 @@
 
 이 프로젝트의 주요 변경 사항을 기록합니다.
 
+## [1.1.1] - 2025-02-11
+
+### 수정
+
+- **NVIDIA NVENC 호환성** - 구형 NVIDIA GPU(예: Quadro P1000) 호환을 위해 B-frames 옵션 제거
+- **Intel QuickSync 호환성** - 구형 Intel GPU 호환을 위해 `main10` 대신 `main` 프로파일 강제 사용
+- **AMD AMF 호환성** - 구형 AMD GPU 호환을 위해 `main10` 대신 `main` 프로파일 강제 사용
+
 ## [1.1.0] - 2025-02-11
 
 ### 추가

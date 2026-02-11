@@ -273,6 +273,7 @@ func getEncoderArgs(encoderID string, settings EncodingSettings, level string, k
 	case "hevc_nvenc":
 		// NVIDIA NVENC
 		// CQ mode with quality value (0-51, lower is better)
+		// Note: B-frames removed for compatibility with older NVIDIA GPUs (e.g., Quadro P1000)
 		return []string{
 			"-c:v", "hevc_nvenc",
 			"-rc", "vbr",
@@ -281,29 +282,38 @@ func getEncoderArgs(encoderID string, settings EncodingSettings, level string, k
 			"-profile:v", settings.EncoderProfile,
 			"-level:v", level,
 			"-g", fmt.Sprintf("%d", keyint),
-			"-bf", "3",
 		}
 
 	case "hevc_qsv":
 		// Intel QuickSync
+		// Note: Some older Intel GPUs only support 'main' profile (not main10)
+		profile := settings.EncoderProfile
+		if profile == "main10" {
+			profile = "main" // Fallback for compatibility
+		}
 		return []string{
 			"-c:v", "hevc_qsv",
 			"-global_quality", fmt.Sprintf("%d", settings.Quality),
 			"-preset", mapQsvPreset(settings.EncoderPreset),
-			"-profile:v", settings.EncoderProfile,
+			"-profile:v", profile,
 			"-level:v", level,
 			"-g", fmt.Sprintf("%d", keyint),
 		}
 
 	case "hevc_amf":
 		// AMD AMF
+		// Note: Older AMD GPUs may not support main10 profile
+		profile := settings.EncoderProfile
+		if profile == "main10" {
+			profile = "main" // Fallback for compatibility
+		}
 		return []string{
 			"-c:v", "hevc_amf",
 			"-rc", "cqp",
 			"-qp_i", fmt.Sprintf("%d", settings.Quality),
 			"-qp_p", fmt.Sprintf("%d", settings.Quality),
 			"-quality", mapAmfQuality(settings.EncoderPreset),
-			"-profile:v", settings.EncoderProfile,
+			"-profile:v", profile,
 			"-level:v", level,
 			"-gops_per_idr", "1",
 		}

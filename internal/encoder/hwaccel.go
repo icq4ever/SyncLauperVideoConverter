@@ -26,6 +26,8 @@ func (f *FFmpeg) GetAvailableHWEncoders() []HWEncoder {
 	availableEncoders := f.getFFmpegEncoders()
 
 	// Check which encoders are available
+	// Note: This only checks if the encoder is listed in FFmpeg, not if it actually works
+	// Some encoders (like hevc_qsv) may be listed but fail at runtime if hardware is unavailable
 	var result []HWEncoder
 	for _, enc := range allEncoders {
 		enc.Available = availableEncoders[enc.ID]
