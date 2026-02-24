@@ -144,11 +144,11 @@ func DetermineLevel(width, height int, fps float64) string {
 
 // ToFFmpegArgs converts a preset to FFmpeg arguments
 func (p *Preset) ToFFmpegArgs(inputPath, outputPath string, sourceInfo *FileInfo) []string {
-	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265", 0)
+	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265", 0, 0)
 }
 
 // ToFFmpegArgsWithEncoder converts a preset to FFmpeg arguments with specified encoder
-func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string, quality int) []string {
+func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string, quality int, blackIntroDuration int) []string {
 	settings := DefaultSettings()
 	if quality > 0 {
 		settings.Quality = quality
@@ -180,6 +180,15 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 		keyint = 30 // fallback
 	}
 
+	if blackIntroDuration > 0 {
+		return p.buildArgsWithBlackIntro(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration)
+	}
+
+	return p.buildStandardArgs(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint)
+}
+
+// buildStandardArgs builds FFmpeg args without black intro (original logic)
+func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int) []string {
 	args := []string{
 		"-i", inputPath,
 	}
@@ -211,9 +220,7 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 
 	// Deinterlace filter (equivalent to HandBrake's decomb)
 	if settings.Decomb {
-		// Use yadif in auto mode: only deinterlace if input is interlaced
 		if !p.UseSourceRes && p.Width > 0 {
-			// Already have a -vf, need to prepend yadif
 			for i, arg := range args {
 				if arg == "-vf" && i+1 < len(args) {
 					args[i+1] = "yadif=mode=0:parity=-1:deint=1," + args[i+1]
@@ -227,8 +234,70 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 
 	// Output format
 	args = append(args, "-f", "matroska")
+	args = append(args, outputPath)
 
-	// Output path (must be last)
+	return args
+}
+
+// buildArgsWithBlackIntro builds FFmpeg args with black intro prepended
+func (p *Preset) buildArgsWithBlackIntro(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, blackDuration int) []string {
+	fpsStr := fmt.Sprintf("%.3f", effectiveFPS)
+
+	// Build inputs: black video, silent audio, then source file
+	args := []string{
+		"-f", "lavfi", "-i", fmt.Sprintf("color=black:s=%dx%d:d=%d:r=%s", effectiveWidth, effectiveHeight, blackDuration, fpsStr),
+		"-f", "lavfi", "-t", fmt.Sprintf("%d", blackDuration), "-i", "anullsrc=r=48000:cl=stereo",
+		"-i", inputPath,
+	}
+
+	// Build filter_complex
+	// [0:v] = black video, [1:a] = silent audio, [2:v] = source video, [2:a] = source audio
+	videoFilter := ""
+	// Apply scale to source video if needed
+	if !p.UseSourceRes && p.Width > 0 && p.Height > 0 {
+		videoFilter = fmt.Sprintf("[2:v]scale=%d:%d", p.Width, p.Height)
+		if settings.Decomb {
+			videoFilter += ",yadif=mode=0:parity=-1:deint=1"
+		}
+		videoFilter += "[srcv];"
+	} else if settings.Decomb {
+		videoFilter = "[2:v]yadif=mode=0:parity=-1:deint=1[srcv];"
+	}
+
+	var filterComplex string
+	if videoFilter != "" {
+		// Source video was filtered → use [srcv]
+		filterComplex = fmt.Sprintf("%s[0:v][1:a][srcv][2:a]concat=n=2:v=1:a=1[v][a]", videoFilter)
+	} else {
+		// No filter on source → use [2:v] directly
+		filterComplex = "[0:v][1:a][2:v][2:a]concat=n=2:v=1:a=1[v][a]"
+	}
+
+	args = append(args, "-filter_complex", filterComplex)
+	args = append(args, "-map", "[v]", "-map", "[a]")
+
+	// Add encoder-specific video codec options
+	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint, effectiveWidth, effectiveHeight)...)
+
+	// Add framerate if not using source
+	if !p.UseSourceFPS && p.FPS > 0 {
+		args = append(args, "-r", fpsStr)
+	}
+
+	// CFR mode
+	if settings.CFR {
+		args = append(args, "-vsync", "cfr")
+	}
+
+	// Audio settings
+	args = append(args,
+		"-c:a", "aac",
+		"-b:a", fmt.Sprintf("%dk", settings.AudioBitrate),
+		"-ac", "2",
+	)
+
+	// Output format
+	args = append(args, "-f", "matroska")
 	args = append(args, outputPath)
 
 	return args

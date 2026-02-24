@@ -2,8 +2,8 @@
   import { createEventDispatcher } from 'svelte';
   import { files, selectedFiles, selectedCount, durationMismatch } from '../stores/files';
   import { isEncoding } from '../stores/encoding';
-  import { selectedPreset, selectedPresetName, selectedEncoderID, selectedQuality } from '../stores/settings';
-  import { StartEncoding, CancelEncoding, CheckDurationMismatch, SetEncoder, SetQuality } from '../../../wailsjs/go/main/App';
+  import { selectedPreset, selectedPresetName, selectedEncoderID, selectedQuality, blackIntroEnabled, blackIntroDuration } from '../stores/settings';
+  import { StartEncoding, CancelEncoding, CheckDurationMismatch, SetEncoder, SetQuality, SetBlackIntroDuration } from '../../../wailsjs/go/main/App';
   import { startEncoding, stopEncoding } from '../stores/encoding';
 
   const dispatch = createEventDispatcher();
@@ -103,9 +103,10 @@
     showUpscaleDialog = false;
 
     try {
-      // Set the selected encoder and quality before starting
+      // Set the selected encoder, quality and black intro before starting
       await SetEncoder($selectedEncoderID);
       await SetQuality($selectedQuality);
+      await SetBlackIntroDuration($blackIntroEnabled ? $blackIntroDuration : 0);
       startEncoding();
       await StartEncoding($selectedPresetName);
     } catch (error) {
@@ -127,9 +128,40 @@
     showConfirmDialog = false;
     showUpscaleDialog = false;
   }
+
+  function handleBlackIntroToggle(event: Event) {
+    const target = event.target as HTMLInputElement;
+    blackIntroEnabled.set(target.checked);
+  }
+
+  function handleBlackIntroDurationChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    blackIntroDuration.set(Number(target.value));
+  }
 </script>
 
 <div class="control-buttons">
+  <div class="black-intro-controls">
+    <label class="checkbox-label">
+      <input
+        type="checkbox"
+        checked={$blackIntroEnabled}
+        on:change={handleBlackIntroToggle}
+        disabled={$isEncoding}
+      />
+      앞 공백
+    </label>
+    <select
+      value={$blackIntroDuration}
+      on:change={handleBlackIntroDurationChange}
+      disabled={$isEncoding || !$blackIntroEnabled}
+    >
+      <option value={1}>1초</option>
+      <option value={2}>2초</option>
+      <option value={3}>3초</option>
+    </select>
+  </div>
+
   {#if $isEncoding}
     <button class="btn-cancel" on:click={handleCancel}>
       취소
@@ -202,6 +234,57 @@
     display: flex;
     gap: 12px;
     justify-content: flex-end;
+    align-items: center;
+  }
+
+  .black-intro-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: auto;
+  }
+
+  .black-intro-controls select {
+    -webkit-appearance: none;
+    appearance: none;
+    padding: 8px 28px 8px 10px;
+    font-size: 13px;
+    background: var(--bg-secondary, #1a1a1a);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    border: 1px solid var(--border-color, #444);
+    border-radius: 6px;
+    color: var(--text-primary, #fff);
+    cursor: pointer;
+    min-width: 65px;
+  }
+
+  .black-intro-controls select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent-color, #4a9eff);
+    cursor: pointer;
+  }
+
+  .checkbox-label input[type="checkbox"]:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .btn-start {
