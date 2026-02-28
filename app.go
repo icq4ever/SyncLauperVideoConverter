@@ -394,6 +394,11 @@ func (a *App) SetQuality(crf int) {
 	a.encoder.SetQuality(crf)
 }
 
+// SetBlackIntroDuration sets the black intro duration in seconds (0 = disabled)
+func (a *App) SetBlackIntroDuration(seconds int) {
+	a.encoder.SetBlackIntroDuration(seconds)
+}
+
 // OpenFileDialog opens a file selection dialog
 func (a *App) OpenFileDialog() ([]string, error) {
 	files, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
@@ -434,7 +439,7 @@ func (a *App) GetAppInfo() map[string]string {
 	version, _ := a.encoder.GetFFmpegVersion()
 	return map[string]string{
 		"appName":        "SyncLauper VideoConverter",
-		"appVersion":     "1.1.1",
+		"appVersion":     "1.1.2",
 		"ffmpegVersion":  version,
 	}
 }

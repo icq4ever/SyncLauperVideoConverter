@@ -179,7 +179,7 @@
   {/if}
 
   <footer class="app-footer">
-    <span>SyncLauper VideoConverter v{appInfo?.appVersion || '1.1.1'}</span>
+    <span>SyncLauper VideoConverter v{appInfo?.appVersion || '1.1.2'}</span>
   </footer>
 </main>
 

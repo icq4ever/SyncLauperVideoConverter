@@ -88,6 +88,9 @@
         {$selectedEncoder.description}
       </div>
     {/if}
+    {#if $qualityLevels.length > 0}
+      <div class="info-spacer"></div>
+    {/if}
   </div>
 </div>
 
@@ -153,7 +156,7 @@
 
   .info-row {
     display: flex;
-    gap: 8px;
+    gap: 12px;
   }
 
   .preset-info,
@@ -166,8 +169,14 @@
     border-radius: 4px;
   }
 
+  .info-spacer {
+    flex: 0 0 auto;
+    min-width: 100px;
+  }
+
   .encoder-info.hardware {
     background: linear-gradient(135deg, #1a2a1a 0%, #222 100%);
     border-left: 2px solid #4a9;
   }
+
 </style>

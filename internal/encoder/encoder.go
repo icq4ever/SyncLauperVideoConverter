@@ -37,8 +37,9 @@ type Encoder struct {
 	completeCb      func(result *EncodeResult, job *EncodingJob)
 	errorCb         func(err error, job *EncodingJob)
 	allCompleteCb   func(completed int, failed int)
-	selectedEncoder string // Selected encoder ID (e.g., "libx265", "hevc_nvenc")
-	qualityLevel    int    // CRF value (0 = use default)
+	selectedEncoder    string // Selected encoder ID (e.g., "libx265", "hevc_nvenc")
+	qualityLevel       int    // CRF value (0 = use default)
+	blackIntroDuration int    // Black intro duration in seconds (0 = disabled)
 }
 
 // NewEncoder creates a new Encoder instance
@@ -121,6 +122,20 @@ func (e *Encoder) GetQuality() int {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.qualityLevel
+}
+
+// SetBlackIntroDuration sets the black intro duration in seconds
+func (e *Encoder) SetBlackIntroDuration(seconds int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.blackIntroDuration = seconds
+}
+
+// GetBlackIntroDuration returns the current black intro duration
+func (e *Encoder) GetBlackIntroDuration() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.blackIntroDuration
 }
 
 // AddJob adds a new encoding job to the queue
@@ -250,7 +265,8 @@ func (e *Encoder) processQueue() {
 		}
 		encoderID := e.GetSelectedEncoder()
 		quality := e.GetQuality()
-		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID, quality)
+		blackIntro := e.GetBlackIntroDuration()
+		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID, quality, blackIntro)
 
 		// Progress callback wrapper
 		progressWrapper := func(progress *EncodingProgress) {
@@ -268,8 +284,9 @@ func (e *Encoder) processQueue() {
 			}
 		}
 
-		// Run encoding with duration for progress calculation
-		result, err := e.ffmpeg.Encode(e.cancelCtx, args, job.FileInfo.DurationSeconds, progressWrapper)
+		// Run encoding with duration for progress calculation (add black intro to total duration)
+		totalDuration := job.FileInfo.DurationSeconds + float64(blackIntro)
+		result, err := e.ffmpeg.Encode(e.cancelCtx, args, totalDuration, progressWrapper)
 
 		// Check for cancellation
 		if e.cancelCtx.Err() == context.Canceled {

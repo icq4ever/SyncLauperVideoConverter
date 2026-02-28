@@ -22,6 +22,10 @@ export const qualityLevels = writable<QualityLevel[]>([]);
 // Selected quality (CRF value)
 export const selectedQuality = writable<number>(22);
 
+// Black intro settings
+export const blackIntroEnabled = writable<boolean>(true);
+export const blackIntroDuration = writable<number>(1);
+
 // Derived store for selected preset
 export const selectedPreset = derived(
   [presets, selectedPresetName],
@@ -70,4 +74,11 @@ export function setQualityLevels(levels: QualityLevel[]) {
 
 export function selectQuality(crf: number) {
   selectedQuality.set(crf);
+}
+
+export function setBlackIntro(enabled: boolean, duration?: number) {
+  blackIntroEnabled.set(enabled);
+  if (duration !== undefined) {
+    blackIntroDuration.set(duration);
+  }
 }

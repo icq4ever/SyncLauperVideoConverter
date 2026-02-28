@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] - 2026-02-25
+
+### Added
+
+- **Black intro option** - Prepend 1-3 seconds of black frames with silence before encoded video
+  - Checkbox + duration selector in the control bar (left of start button)
+  - Default: 1 second, enabled
+- **Info row alignment** - Preset and encoder description rows now align with selector columns above
+
 ## [1.1.1] - 2025-02-11
 
 ### Fixed
