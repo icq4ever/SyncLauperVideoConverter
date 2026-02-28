@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] - 2026-02-28
+
+### Fixed
+
+- **Intel QuickSync (QSV) encoding failure** - Fixed "Could not open encoder before EOF" error on Intel Iris Xe and newer GPUs
+  - Switched from ICQ mode (`-global_quality`) to CQP mode (`-rc:v CQP -qp`) for broader compatibility
+  - Added `-low_power 1` flag for VDENC-only GPUs (Iris Xe, 11th gen+)
+  - Forced `main` profile fallback when `main10` is unsupported
+- **Encoding errors silently hidden** - Fixed issue where encoding failures disappeared instantly because the progress bar was hidden when encoding stopped
+  - Added encoding result summary UI (success/partial failure/failure) that persists after encoding completes
+  - Users can now see which files failed and dismiss the result manually
+
+### Added
+
+- **Runtime encoder validation** - Hardware encoders are now tested with a 1-frame encode before being listed as available, preventing selection of non-functional encoders
+- **Linux QuickSync/VAAPI support** - Added `hevc_qsv` and `hevc_vaapi` encoder detection on Linux
+- **Prerelease workflow** - Version tags containing `-` (e.g., `v1.1.3-rc.1`) are automatically marked as prerelease on GitHub
+
 ## [1.1.2] - 2026-02-25
 
 ### Added
