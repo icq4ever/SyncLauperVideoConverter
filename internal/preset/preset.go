@@ -373,17 +373,19 @@ func getEncoderArgs(encoderID string, settings EncodingSettings, level string, k
 
 	case "hevc_qsv":
 		// Intel QuickSync
-		// Note: Some older Intel GPUs only support 'main' profile (not main10)
+		// Use CQP mode for maximum compatibility (ICQ/global_quality not supported on all GPUs)
+		// Use low_power mode for newer Intel GPUs (Iris Xe etc.) that only support VDENC path
 		profile := settings.EncoderProfile
 		if profile == "main10" {
 			profile = "main" // Fallback for compatibility
 		}
 		return []string{
 			"-c:v", "hevc_qsv",
-			"-global_quality", fmt.Sprintf("%d", settings.Quality),
+			"-low_power", "1",
+			"-rc:v", "CQP",
+			"-qp", fmt.Sprintf("%d", settings.Quality),
 			"-preset", mapQsvPreset(settings.EncoderPreset),
 			"-profile:v", profile,
-			"-level:v", level,
 			"-g", fmt.Sprintf("%d", keyint),
 		}
 
