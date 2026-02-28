@@ -180,9 +180,12 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 		keyint = 30 // fallback
 	}
 
-	args := []string{
-		"-i", inputPath,
-	}
+	args := []string{}
+
+	// Add pre-input args for hardware encoders (must come before -i)
+	args = append(args, getPreInputArgs(encoderID)...)
+
+	args = append(args, "-i", inputPath)
 
 	// Add encoder-specific video codec options
 	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint, effectiveWidth, effectiveHeight)...)
@@ -240,6 +243,18 @@ func (p *Preset) GetPresetInfo() string {
 		return "원본 해상도 및 프레임레이트 유지, HEVC 인코딩"
 	}
 	return fmt.Sprintf("%s @ %sfps, HEVC 인코딩", p.Resolution, p.Framerate)
+}
+
+// getPreInputArgs returns FFmpeg arguments that must appear before -i for hardware encoders
+func getPreInputArgs(encoderID string) []string {
+	switch encoderID {
+	case "hevc_qsv":
+		return []string{"-init_hw_device", "qsv=hw", "-filter_hw_device", "hw"}
+	case "hevc_vaapi":
+		return []string{"-init_hw_device", "vaapi=hw:/dev/dri/renderD128", "-filter_hw_device", "hw"}
+	default:
+		return nil
+	}
 }
 
 // getEncoderArgs returns encoder-specific FFmpeg arguments

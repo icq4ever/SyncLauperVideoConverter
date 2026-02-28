@@ -13,7 +13,7 @@
 
   import { files, durationMismatch, clearFiles } from './lib/stores/files';
   import { setPresets, setOutputFolder, setAvailableEncoders, setQualityLevels } from './lib/stores/settings';
-  import { isEncoding, updateProgress, fileCompleted, fileError, stopEncoding } from './lib/stores/encoding';
+  import { isEncoding, hasEncodingResults, updateProgress, fileCompleted, fileError, stopEncoding, resetEncoding } from './lib/stores/encoding';
 
   import type { EncodingProgress, DurationCheckResult, EncodingStatus } from './lib/types';
 
@@ -166,7 +166,7 @@
         </div>
       </section>
 
-      {#if $isEncoding}
+      {#if $isEncoding || $hasEncodingResults}
         <section class="section">
           <ProgressBar />
         </section>

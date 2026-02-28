@@ -1,9 +1,12 @@
 package encoder
 
 import (
+	"context"
+	"fmt"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 
 	"syncLauperVideoConverter/internal/cmdutil"
 )
@@ -25,15 +28,19 @@ func (f *FFmpeg) GetAvailableHWEncoders() []HWEncoder {
 	// Get list of encoders from FFmpeg
 	availableEncoders := f.getFFmpegEncoders()
 
-	// Check which encoders are available
-	// Note: This only checks if the encoder is listed in FFmpeg, not if it actually works
-	// Some encoders (like hevc_qsv) may be listed but fail at runtime if hardware is unavailable
+	// Check which encoders are available and actually work
 	var result []HWEncoder
 	for _, enc := range allEncoders {
-		enc.Available = availableEncoders[enc.ID]
-		if enc.Available {
-			result = append(result, enc)
+		if !availableEncoders[enc.ID] {
+			continue
 		}
+		// Runtime test: verify the encoder actually works on this hardware
+		if err := f.TestEncoder(enc.ID); err != nil {
+			fmt.Printf("[HWAccel] %s listed but failed runtime test: %v\n", enc.ID, err)
+			continue
+		}
+		enc.Available = true
+		result = append(result, enc)
 	}
 
 	// Always add software encoder as fallback
@@ -92,10 +99,16 @@ func getKnownHWEncoders() []HWEncoder {
 				Priority:    100,
 			},
 			{
+				ID:          "hevc_qsv",
+				Name:        "Intel QuickSync",
+				Description: "Intel 내장 GPU 인코딩",
+				Priority:    90,
+			},
+			{
 				ID:          "hevc_vaapi",
 				Name:        "VAAPI",
 				Description: "Linux VA-API 인코딩 (Intel/AMD)",
-				Priority:    90,
+				Priority:    80,
 			},
 		}
 	}
@@ -131,6 +144,39 @@ func (f *FFmpeg) getFFmpegEncoders() map[string]bool {
 	}
 
 	return result
+}
+
+// TestEncoder tests if a hardware encoder actually works by running a quick 1-frame encode
+func (f *FFmpeg) TestEncoder(encoderID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Build test encode command: generate 1 frame of null video and encode it
+	args := []string{
+		"-hide_banner",
+		"-loglevel", "error",
+	}
+
+	// Add pre-input args for hardware encoders
+	switch encoderID {
+	case "hevc_qsv":
+		args = append(args, "-init_hw_device", "qsv=hw", "-filter_hw_device", "hw")
+	}
+
+	args = append(args,
+		"-f", "lavfi", "-i", "nullsrc=s=256x256:d=0.1",
+		"-c:v", encoderID,
+		"-frames:v", "1",
+		"-f", "null", "-",
+	)
+
+	cmd := exec.CommandContext(ctx, f.config.ExecutablePath, args...)
+	cmdutil.HideWindow(cmd)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s 인코더 테스트 실패: %s", encoderID, strings.TrimSpace(string(output)))
+	}
+	return nil
 }
 
 // GetBestEncoder returns the best available encoder (highest priority)

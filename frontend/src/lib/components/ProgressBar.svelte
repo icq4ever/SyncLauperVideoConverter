@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentProgress, completedCount, errorCount, errorFiles } from '../stores/encoding';
+  import { currentProgress, completedCount, errorCount, errorFiles, isEncoding, resetEncoding } from '../stores/encoding';
   import { totalCount } from '../stores/files';
 
   $: overallProgress = $totalCount > 0
@@ -8,7 +8,31 @@
 </script>
 
 <div class="progress-container">
-  {#if $currentProgress}
+  {#if !$isEncoding && ($completedCount > 0 || $errorCount > 0)}
+    <!-- Encoding finished: show summary -->
+    <div class="result-summary">
+      <div class="result-header">
+        <span class="result-title">
+          {#if $errorCount > 0 && $completedCount === 0}
+            인코딩 실패
+          {:else if $errorCount > 0}
+            인코딩 완료 (일부 실패)
+          {:else}
+            인코딩 완료
+          {/if}
+        </span>
+        <button class="btn-dismiss" on:click={resetEncoding}>닫기</button>
+      </div>
+      <div class="completion-stats">
+        {#if $completedCount > 0}
+          <span class="completed">성공: {$completedCount}</span>
+        {/if}
+        {#if $errorCount > 0}
+          <span class="errors">실패: {$errorCount}</span>
+        {/if}
+      </div>
+    </div>
+  {:else if $currentProgress}
     <div class="progress-header">
       <div class="file-info">
         <span class="current-file">{$currentProgress.filename}</span>
@@ -234,5 +258,39 @@
     word-break: break-all;
     max-height: 80px;
     overflow-y: auto;
+  }
+
+  .result-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .result-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary, #fff);
+  }
+
+  .btn-dismiss {
+    padding: 4px 12px;
+    font-size: 12px;
+    background: var(--bg-tertiary, #252525);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-dismiss:hover {
+    background: var(--bg-hover, #2a2a2a);
+    color: var(--text-primary, #fff);
   }
 </style>
