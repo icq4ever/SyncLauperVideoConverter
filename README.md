@@ -47,6 +47,21 @@ Automatically detects available hardware encoders for faster encoding.
 - **macOS 11 Big Sur** or later
 - **FFmpeg** - Included in release package
 
+### Linux
+- **x86_64** distribution with glibc 2.31+ (Ubuntu 20.04+, Fedora 34+, Arch, etc.)
+- **FFmpeg** - Included in release package (with NVENC/QSV/VAAPI/AMF support)
+- **Runtime libraries** - `webkit2gtk-4.1`, `gtk3` (auto-installed by `install.sh`)
+- **Hardware acceleration (optional)** - Install drivers for your GPU:
+
+  | GPU | Packages |
+  |-----|----------|
+  | Intel (11th gen+) VAAPI/QSV | Debian/Ubuntu: `intel-media-va-driver-non-free libva-drm2`<br>Fedora: `intel-media-driver libva`<br>Arch: `intel-media-driver libva-utils` |
+  | Intel (older) VAAPI | Debian/Ubuntu: `i965-va-driver libva-drm2`<br>Fedora: `libva-intel-driver`<br>Arch: `libva-intel-driver` |
+  | AMD VAAPI | Debian/Ubuntu: `mesa-va-drivers`<br>Fedora: `mesa-va-drivers-freeworld`<br>Arch: `libva-mesa-driver` |
+  | NVIDIA NVENC | Proprietary driver (`nvidia-driver` / `nvidia`) |
+
+  Verify VAAPI works: `vainfo | grep HEVC` (install `libva-utils` for `vainfo`)
+
 ## Installation
 
 ### Windows
@@ -79,6 +94,22 @@ SyncLauperVideoConverter/
 ├── ffmpeg
 └── ffprobe (optional)
 ```
+
+### Linux
+
+1. Download `*-linux-amd64.tar.gz` from [Releases](https://github.com/icq4ever/SyncLauperVideoConverter/releases)
+2. Extract: `tar xzf SyncLauperVideoConverter-*-linux-amd64.tar.gz`
+3. Install to `/opt` and register desktop entry:
+   ```bash
+   cd SyncLauperVideoConverter-*-linux-amd64
+   ./install.sh
+   ```
+   The installer auto-detects your package manager (apt/dnf/pacman/zypper) and installs `webkit2gtk-4.1` + `gtk3`.
+4. Launch from the application menu or run `syncLauperVideoConverter` in a terminal.
+
+To uninstall: `sudo /opt/syncLauperVideoConverter/uninstall.sh`
+
+For hardware acceleration, install the GPU driver packages listed in the Requirements section above.
 
 ## Building from Source
 

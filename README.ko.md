@@ -47,6 +47,21 @@
 - **macOS 11 Big Sur** 이상
 - **FFmpeg** - 릴리스 패키지에 포함됨
 
+### Linux
+- **x86_64** 배포판, glibc 2.31 이상 (Ubuntu 20.04+, Fedora 34+, Arch 등)
+- **FFmpeg** - 릴리스 패키지에 포함됨 (NVENC/QSV/VAAPI/AMF 지원 빌드)
+- **런타임 라이브러리** - `webkit2gtk-4.1`, `gtk3` (설치 스크립트가 자동 설치)
+- **하드웨어 가속 (선택)** - GPU에 맞는 드라이버 설치:
+
+  | GPU | 패키지 |
+  |-----|--------|
+  | Intel (11세대 이상) VAAPI/QSV | Debian/Ubuntu: `intel-media-va-driver-non-free libva-drm2`<br>Fedora: `intel-media-driver libva`<br>Arch: `intel-media-driver libva-utils` |
+  | Intel (구형) VAAPI | Debian/Ubuntu: `i965-va-driver libva-drm2`<br>Fedora: `libva-intel-driver`<br>Arch: `libva-intel-driver` |
+  | AMD VAAPI | Debian/Ubuntu: `mesa-va-drivers`<br>Fedora: `mesa-va-drivers-freeworld`<br>Arch: `libva-mesa-driver` |
+  | NVIDIA NVENC | 공식 드라이버 (`nvidia-driver` / `nvidia`) |
+
+  VAAPI 동작 확인: `vainfo | grep HEVC` (`libva-utils` 패키지 필요)
+
 ## 설치 방법
 
 ### Windows
@@ -79,6 +94,22 @@ SyncLauperVideoConverter/
 ├── ffmpeg
 └── ffprobe (선택사항)
 ```
+
+### Linux
+
+1. [Releases](https://github.com/icq4ever/SyncLauperVideoConverter/releases)에서 `*-linux-amd64.tar.gz` 다운로드
+2. 압축 해제: `tar xzf SyncLauperVideoConverter-*-linux-amd64.tar.gz`
+3. `/opt` 에 설치 + 데스크톱 엔트리 등록:
+   ```bash
+   cd SyncLauperVideoConverter-*-linux-amd64
+   ./install.sh
+   ```
+   설치 스크립트가 패키지 매니저(apt/dnf/pacman/zypper)를 감지해 `webkit2gtk-4.1` + `gtk3` 를 자동 설치합니다.
+4. 애플리케이션 메뉴에서 실행하거나 터미널에서 `syncLauperVideoConverter` 입력.
+
+제거: `sudo /opt/syncLauperVideoConverter/uninstall.sh`
+
+하드웨어 가속을 쓰려면 위 요구사항의 GPU 드라이버 패키지를 추가 설치하세요.
 
 ## 소스에서 빌드하기
 

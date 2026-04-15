@@ -444,7 +444,7 @@ func (a *App) GetAppInfo() map[string]string {
 	version, _ := a.encoder.GetFFmpegVersion()
 	return map[string]string{
 		"appName":        "SyncLauper VideoConverter",
-		"appVersion":     "1.1.5",
+		"appVersion":     "1.1.6",
 		"ffmpegVersion":  version,
 	}
 }

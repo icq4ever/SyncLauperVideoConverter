@@ -206,12 +206,15 @@ jobs:
       - name: Download FFmpeg for Linux
         run: |
           set -e
-          curl -fL "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz" -o ffmpeg.tar.xz
+          # BtbN builds include NVENC/QSV/VAAPI/AMF hardware encoders
+          curl -fL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz" -o ffmpeg.tar.xz
           mkdir -p ffmpeg-tmp
           tar -xf ffmpeg.tar.xz -C ffmpeg-tmp --strip-components=1
-          cp ffmpeg-tmp/ffmpeg build/bin/
-          cp ffmpeg-tmp/ffprobe build/bin/
+          cp ffmpeg-tmp/bin/ffmpeg build/bin/
+          cp ffmpeg-tmp/bin/ffprobe build/bin/
           chmod +x build/bin/ffmpeg build/bin/ffprobe
+          # Verify HW encoders are present
+          ./build/bin/ffmpeg -hide_banner -encoders 2>&1 | grep -E 'hevc_(qsv|vaapi|nvenc|amf)' || echo "WARNING: HW encoders not found in build"
 
       - name: Create Release Package
         run: |

@@ -23,11 +23,11 @@ export const qualityLevels = writable<QualityLevel[]>([]);
 export const selectedQuality = writable<number>(22);
 
 // Black intro settings
-export const blackIntroEnabled = writable<boolean>(true);
+export const blackIntroEnabled = writable<boolean>(false);
 export const blackIntroDuration = writable<number>(1);
 
 // Black outro settings
-export const blackOutroEnabled = writable<boolean>(false);
+export const blackOutroEnabled = writable<boolean>(true);
 export const blackOutroDuration = writable<number>(1);
 
 // Derived store for selected preset
