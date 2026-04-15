@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=SyncLauper VideoConverter
+Comment=HEVC video converter optimized for SyncLauper sync playback
+Exec=/opt/syncLauperVideoConverter/syncLauperVideoConverter
+Icon=/opt/syncLauperVideoConverter/icon.png
+Terminal=false
+Categories=AudioVideo;Video;
+StartupWMClass=syncLauperVideoConverter
