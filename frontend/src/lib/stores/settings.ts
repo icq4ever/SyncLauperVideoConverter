@@ -26,6 +26,10 @@ export const selectedQuality = writable<number>(22);
 export const blackIntroEnabled = writable<boolean>(true);
 export const blackIntroDuration = writable<number>(1);
 
+// Black outro settings
+export const blackOutroEnabled = writable<boolean>(false);
+export const blackOutroDuration = writable<number>(1);
+
 // Derived store for selected preset
 export const selectedPreset = derived(
   [presets, selectedPresetName],

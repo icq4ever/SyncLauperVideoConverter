@@ -144,11 +144,11 @@ func DetermineLevel(width, height int, fps float64) string {
 
 // ToFFmpegArgs converts a preset to FFmpeg arguments
 func (p *Preset) ToFFmpegArgs(inputPath, outputPath string, sourceInfo *FileInfo) []string {
-	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265", 0, 0)
+	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265", 0, 0, 0)
 }
 
 // ToFFmpegArgsWithEncoder converts a preset to FFmpeg arguments with specified encoder
-func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string, quality int, blackIntroDuration int) []string {
+func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string, quality int, blackIntroDuration int, blackOutroDuration int) []string {
 	settings := DefaultSettings()
 	if quality > 0 {
 		settings.Quality = quality
@@ -180,8 +180,8 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 		keyint = 30 // fallback
 	}
 
-	if blackIntroDuration > 0 {
-		return p.buildArgsWithBlackIntro(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration)
+	if blackIntroDuration > 0 || blackOutroDuration > 0 {
+		return p.buildArgsWithBlackPad(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration, blackOutroDuration)
 	}
 
 	return p.buildStandardArgs(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint)
@@ -242,43 +242,78 @@ func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings Encodi
 	return args
 }
 
-// buildArgsWithBlackIntro builds FFmpeg args with black intro prepended
-func (p *Preset) buildArgsWithBlackIntro(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, blackDuration int) []string {
+// buildArgsWithBlackPad builds FFmpeg args with black intro and/or outro padding
+func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, introDuration, outroDuration int) []string {
 	fpsStr := fmt.Sprintf("%.3f", effectiveFPS)
 
 	// Add pre-input args for hardware encoders (must come before -i)
 	args := getPreInputArgs(encoderID)
 
-	// Build inputs: black video, silent audio, then source file
-	args = append(args,
-		"-f", "lavfi", "-i", fmt.Sprintf("color=black:s=%dx%d:d=%d:r=%s", effectiveWidth, effectiveHeight, blackDuration, fpsStr),
-		"-f", "lavfi", "-t", fmt.Sprintf("%d", blackDuration), "-i", "anullsrc=r=48000:cl=stereo",
-		"-i", inputPath,
-	)
+	// Build inputs in order: [intro v], [intro a], [src], [outro v], [outro a]
+	inputIdx := 0
+	introVIdx, introAIdx := -1, -1
+	outroVIdx, outroAIdx := -1, -1
 
-	// Build filter_complex
-	// [0:v] = black video, [1:a] = silent audio, [2:v] = source video, [2:a] = source audio
+	if introDuration > 0 {
+		args = append(args,
+			"-f", "lavfi", "-i", fmt.Sprintf("color=black:s=%dx%d:d=%d:r=%s", effectiveWidth, effectiveHeight, introDuration, fpsStr),
+		)
+		introVIdx = inputIdx
+		inputIdx++
+		args = append(args,
+			"-f", "lavfi", "-t", fmt.Sprintf("%d", introDuration), "-i", "anullsrc=r=48000:cl=stereo",
+		)
+		introAIdx = inputIdx
+		inputIdx++
+	}
+
+	args = append(args, "-i", inputPath)
+	srcIdx := inputIdx
+	inputIdx++
+
+	if outroDuration > 0 {
+		args = append(args,
+			"-f", "lavfi", "-i", fmt.Sprintf("color=black:s=%dx%d:d=%d:r=%s", effectiveWidth, effectiveHeight, outroDuration, fpsStr),
+		)
+		outroVIdx = inputIdx
+		inputIdx++
+		args = append(args,
+			"-f", "lavfi", "-t", fmt.Sprintf("%d", outroDuration), "-i", "anullsrc=r=48000:cl=stereo",
+		)
+		outroAIdx = inputIdx
+		inputIdx++
+	}
+
+	// Apply scale/decomb filter on source video if needed
+	srcVideoLabel := fmt.Sprintf("[%d:v]", srcIdx)
 	videoFilter := ""
-	// Apply scale to source video if needed
 	if !p.UseSourceRes && p.Width > 0 && p.Height > 0 {
-		videoFilter = fmt.Sprintf("[2:v]scale=%d:%d", p.Width, p.Height)
+		videoFilter = fmt.Sprintf("[%d:v]scale=%d:%d", srcIdx, p.Width, p.Height)
 		if settings.Decomb {
 			videoFilter += ",yadif=mode=0:parity=-1:deint=1"
 		}
 		videoFilter += "[srcv];"
+		srcVideoLabel = "[srcv]"
 	} else if settings.Decomb {
-		videoFilter = "[2:v]yadif=mode=0:parity=-1:deint=1[srcv];"
+		videoFilter = fmt.Sprintf("[%d:v]yadif=mode=0:parity=-1:deint=1[srcv];", srcIdx)
+		srcVideoLabel = "[srcv]"
 	}
 
-	var filterComplex string
-	if videoFilter != "" {
-		// Source video was filtered → use [srcv]
-		filterComplex = fmt.Sprintf("%s[0:v][1:a][srcv][2:a]concat=n=2:v=1:a=1[v][a]", videoFilter)
-	} else {
-		// No filter on source → use [2:v] directly
-		filterComplex = "[0:v][1:a][2:v][2:a]concat=n=2:v=1:a=1[v][a]"
+	// Build concat segments
+	parts := ""
+	n := 0
+	if introDuration > 0 {
+		parts += fmt.Sprintf("[%d:v][%d:a]", introVIdx, introAIdx)
+		n++
+	}
+	parts += fmt.Sprintf("%s[%d:a]", srcVideoLabel, srcIdx)
+	n++
+	if outroDuration > 0 {
+		parts += fmt.Sprintf("[%d:v][%d:a]", outroVIdx, outroAIdx)
+		n++
 	}
 
+	filterComplex := fmt.Sprintf("%s%sconcat=n=%d:v=1:a=1[v][a]", videoFilter, parts, n)
 	args = append(args, "-filter_complex", filterComplex)
 	args = append(args, "-map", "[v]", "-map", "[a]")
 

@@ -40,6 +40,7 @@ type Encoder struct {
 	selectedEncoder    string // Selected encoder ID (e.g., "libx265", "hevc_nvenc")
 	qualityLevel       int    // CRF value (0 = use default)
 	blackIntroDuration int    // Black intro duration in seconds (0 = disabled)
+	blackOutroDuration int    // Black outro duration in seconds (0 = disabled)
 }
 
 // NewEncoder creates a new Encoder instance
@@ -136,6 +137,20 @@ func (e *Encoder) GetBlackIntroDuration() int {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.blackIntroDuration
+}
+
+// SetBlackOutroDuration sets the black outro duration in seconds
+func (e *Encoder) SetBlackOutroDuration(seconds int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.blackOutroDuration = seconds
+}
+
+// GetBlackOutroDuration returns the current black outro duration
+func (e *Encoder) GetBlackOutroDuration() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.blackOutroDuration
 }
 
 // AddJob adds a new encoding job to the queue
@@ -266,7 +281,8 @@ func (e *Encoder) processQueue() {
 		encoderID := e.GetSelectedEncoder()
 		quality := e.GetQuality()
 		blackIntro := e.GetBlackIntroDuration()
-		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID, quality, blackIntro)
+		blackOutro := e.GetBlackOutroDuration()
+		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID, quality, blackIntro, blackOutro)
 
 		// Progress callback wrapper
 		progressWrapper := func(progress *EncodingProgress) {
@@ -284,8 +300,8 @@ func (e *Encoder) processQueue() {
 			}
 		}
 
-		// Run encoding with duration for progress calculation (add black intro to total duration)
-		totalDuration := job.FileInfo.DurationSeconds + float64(blackIntro)
+		// Run encoding with duration for progress calculation (add black intro/outro to total duration)
+		totalDuration := job.FileInfo.DurationSeconds + float64(blackIntro) + float64(blackOutro)
 		result, err := e.ffmpeg.Encode(e.cancelCtx, args, totalDuration, progressWrapper)
 
 		// Check for cancellation

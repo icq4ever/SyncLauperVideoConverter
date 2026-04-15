@@ -2,8 +2,8 @@
   import { createEventDispatcher } from 'svelte';
   import { files, selectedFiles, selectedCount, durationMismatch } from '../stores/files';
   import { isEncoding } from '../stores/encoding';
-  import { selectedPreset, selectedPresetName, selectedEncoderID, selectedQuality, blackIntroEnabled, blackIntroDuration } from '../stores/settings';
-  import { StartEncoding, CancelEncoding, CheckDurationMismatch, SetEncoder, SetQuality, SetBlackIntroDuration } from '../../../wailsjs/go/main/App';
+  import { selectedPreset, selectedPresetName, selectedEncoderID, selectedQuality, blackIntroEnabled, blackIntroDuration, blackOutroEnabled, blackOutroDuration } from '../stores/settings';
+  import { StartEncoding, CancelEncoding, CheckDurationMismatch, SetEncoder, SetQuality, SetBlackIntroDuration, SetBlackOutroDuration } from '../../../wailsjs/go/main/App';
   import { startEncoding, stopEncoding } from '../stores/encoding';
 
   const dispatch = createEventDispatcher();
@@ -107,6 +107,7 @@
       await SetEncoder($selectedEncoderID);
       await SetQuality($selectedQuality);
       await SetBlackIntroDuration($blackIntroEnabled ? $blackIntroDuration : 0);
+      await SetBlackOutroDuration($blackOutroEnabled ? $blackOutroDuration : 0);
       startEncoding();
       await StartEncoding($selectedPresetName);
     } catch (error) {
@@ -138,6 +139,16 @@
     const target = event.target as HTMLSelectElement;
     blackIntroDuration.set(Number(target.value));
   }
+
+  function handleBlackOutroToggle(event: Event) {
+    const target = event.target as HTMLInputElement;
+    blackOutroEnabled.set(target.checked);
+  }
+
+  function handleBlackOutroDurationChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    blackOutroDuration.set(Number(target.value));
+  }
 </script>
 
 <div class="control-buttons">
@@ -155,6 +166,25 @@
       value={$blackIntroDuration}
       on:change={handleBlackIntroDurationChange}
       disabled={$isEncoding || !$blackIntroEnabled}
+    >
+      <option value={1}>1초</option>
+      <option value={2}>2초</option>
+      <option value={3}>3초</option>
+    </select>
+
+    <label class="checkbox-label">
+      <input
+        type="checkbox"
+        checked={$blackOutroEnabled}
+        on:change={handleBlackOutroToggle}
+        disabled={$isEncoding}
+      />
+      뒤 공백
+    </label>
+    <select
+      value={$blackOutroDuration}
+      on:change={handleBlackOutroDurationChange}
+      disabled={$isEncoding || !$blackOutroEnabled}
     >
       <option value={1}>1초</option>
       <option value={2}>2초</option>
