@@ -12,6 +12,33 @@ if [ "$EUID" -ne 0 ]; then
   exec sudo -E bash "$0" "$@"
 fi
 
+install_deps() {
+  echo "==> 런타임 의존성 확인 (libwebkit2gtk-4.1, libgtk-3)"
+  if ldconfig -p | grep -q 'libwebkit2gtk-4\.1\.so\.0'; then
+    echo "    이미 설치되어 있습니다"
+    return
+  fi
+
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "    apt 로 설치 중..."
+    apt-get update
+    apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0
+  elif command -v dnf >/dev/null 2>&1; then
+    echo "    dnf 로 설치 중..."
+    dnf install -y webkit2gtk4.1 gtk3
+  elif command -v pacman >/dev/null 2>&1; then
+    echo "    pacman 으로 설치 중..."
+    pacman -S --needed --noconfirm webkit2gtk-4.1 gtk3
+  elif command -v zypper >/dev/null 2>&1; then
+    echo "    zypper 로 설치 중..."
+    zypper install -y libwebkit2gtk-4_1-0 libgtk-3-0
+  else
+    echo "    경고: 패키지 매니저를 찾을 수 없습니다. libwebkit2gtk-4.1 과 libgtk-3 를 수동 설치하세요."
+  fi
+}
+
+install_deps
+
 echo "==> $INSTALL_DIR 에 설치합니다"
 mkdir -p "$INSTALL_DIR"
 cp "$SCRIPT_DIR/syncLauperVideoConverter" "$INSTALL_DIR/"
