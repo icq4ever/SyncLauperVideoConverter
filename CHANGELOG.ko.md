@@ -2,6 +2,13 @@
 
 이 프로젝트의 주요 변경 사항을 기록합니다.
 
+## [1.1.4] - 2026-04-15
+
+### 추가
+
+- **리눅스 빌드 지원** - CI에서 `linux/amd64` 빌드 자동화, `ffmpeg`/`ffprobe` 번들 포함하여 `.tar.gz`로 배포
+- **리눅스 설치 스크립트** - `install.sh`/`uninstall.sh` 제공, `/opt/syncLauperVideoConverter`에 설치하고 `.desktop` 파일로 애플리케이션 메뉴에 등록
+
 ## [1.1.3] - 2026-02-28
 
 ### 수정

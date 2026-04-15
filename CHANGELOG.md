@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] - 2026-04-15
+
+### Added
+
+- **Linux build support** - CI now builds `linux/amd64` with bundled `ffmpeg`/`ffprobe`, packaged as `.tar.gz`
+- **Linux install scripts** - `install.sh`/`uninstall.sh` for `/opt/syncLauperVideoConverter` install with `.desktop` entry registration in the application menu
+
 ## [1.1.3] - 2026-02-28
 
 ### Fixed
