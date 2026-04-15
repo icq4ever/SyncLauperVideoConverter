@@ -280,6 +280,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          VERSION_NO_V="${VERSION#v}"
+          # Extract the section between "## [X.Y.Z]" and the next "## [" heading
+          NOTES=$(awk -v header="## [$VERSION_NO_V]" '
+            index($0, header) == 1 { found=1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.ko.md)
+          if [ -z "$NOTES" ]; then
+            NOTES="(변경 사항 없음 — CHANGELOG.ko.md 참고)"
+          fi
+          {
+            echo "NOTES<<CHANGELOG_EOF"
+            echo "$NOTES"
+            echo "CHANGELOG_EOF"
+          } >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -295,6 +315,10 @@ jobs:
             ## SyncLauper VideoConverter ${{ steps.version.outputs.VERSION }}
 
             SyncLauper 동기화 재생에 최적화된 HEVC 영상 변환 도구입니다.
+
+            ### 이번 버전 변경점
+
+            ${{ steps.changelog.outputs.NOTES }}
 
             ### 다운로드
 
