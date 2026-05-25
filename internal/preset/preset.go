@@ -11,6 +11,7 @@ type FileInfo struct {
 	Width     int
 	Height    int
 	Framerate float64
+	HasAudio  bool
 }
 
 // GetAllPresets returns all available SyncLauper presets
@@ -195,21 +196,32 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 		keyint = 30 // fallback
 	}
 
+	hasAudio := sourceInfo != nil && sourceInfo.HasAudio
+
 	if blackIntroDuration > 0 || blackOutroDuration > 0 {
-		return p.buildArgsWithBlackPad(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration, blackOutroDuration, rotation)
+		return p.buildArgsWithBlackPad(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration, blackOutroDuration, rotation, hasAudio)
 	}
 
-	return p.buildStandardArgs(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, rotation)
+	return p.buildStandardArgs(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, rotation, hasAudio)
 }
 
 // buildStandardArgs builds FFmpeg args without black intro (original logic)
-func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, rotation int) []string {
+func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, rotation int, hasAudio bool) []string {
 	args := []string{}
 
 	// Add pre-input args for hardware encoders (must come before -i)
 	args = append(args, getPreInputArgs(encoderID)...)
 
 	args = append(args, "-i", inputPath)
+
+	// If the source has no audio, inject a near-silent white noise track so the
+	// output always carries an audio stream (keeps SyncLauper playback consistent).
+	if !hasAudio {
+		args = append(args,
+			"-f", "lavfi", "-i", "anoisesrc=color=white:amplitude=0.001",
+			"-map", "0:v", "-map", "1:a", "-shortest",
+		)
+	}
 
 	// For 90/270 rotation the output dimensions are swapped — adjust the level
 	// calculation to reflect the post-rotation frame size.
@@ -261,7 +273,7 @@ func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings Encodi
 }
 
 // buildArgsWithBlackPad builds FFmpeg args with black intro and/or outro padding
-func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, introDuration, outroDuration int, rotation int) []string {
+func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, introDuration, outroDuration int, rotation int, hasAudio bool) []string {
 	fpsStr := fmt.Sprintf("%.3f", effectiveFPS)
 
 	// Output (post-rotation) dimensions used for black pad frames and encoder level.
@@ -294,6 +306,17 @@ func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings En
 	args = append(args, "-i", inputPath)
 	srcIdx := inputIdx
 	inputIdx++
+
+	// If source has no audio stream, add a near-silent white noise track and use
+	// it in place of the missing source audio during concat.
+	srcAudioIdx := srcIdx
+	if !hasAudio {
+		args = append(args,
+			"-f", "lavfi", "-i", "anoisesrc=color=white:amplitude=0.001:sample_rate=48000",
+		)
+		srcAudioIdx = inputIdx
+		inputIdx++
+	}
 
 	if outroDuration > 0 {
 		args = append(args,
@@ -334,7 +357,7 @@ func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings En
 		parts += fmt.Sprintf("[%d:v][%d:a]", introVIdx, introAIdx)
 		n++
 	}
-	parts += fmt.Sprintf("%s[%d:a]", srcVideoLabel, srcIdx)
+	parts += fmt.Sprintf("%s[%d:a]", srcVideoLabel, srcAudioIdx)
 	n++
 	if outroDuration > 0 {
 		parts += fmt.Sprintf("[%d:v][%d:a]", outroVIdx, outroAIdx)

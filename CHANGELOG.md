@@ -5,11 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-05-25
+
+### Fixed
+
+- **Encoding failure on silent source videos** - Files with no audio stream (e.g., camera-only `.mov` exports) failed during black pad concat because `[0:a]` matched no streams
+  - Detected from the source's `AudioCodec` field; no extra ffprobe pass
+  - When audio is missing, inject a near-silent white noise track (`anoisesrc amplitude=0.001`, roughly -60 dB) for both the standard and black-pad paths so the output always carries an audio stream — keeps SyncLauper playback consistent
+
 ## [1.2.0] - 2026-05-25
 
 ### Added
 
-- **Video rotation option** - Rotate output video by 90°, 180°, or 270° (clockwise). Selector lives next to the black intro/outro controls and applies to all files in the queue. Output dimensions and encoder level are adjusted automatically for 90°/270°, and black pad frames are sized to match the rotated video
+- **Video rotation** - Rotate output by 90°, 180°, or 270° clockwise. Applies to all files in the queue; selector sits next to the black intro/outro controls
+  - Output resolution and HEVC level adjust automatically when width/height swap (90°/270°)
+  - Black intro/outro frames are generated at the rotated dimensions so concat stays consistent
 
 ## [1.1.6] - 2026-04-16
 

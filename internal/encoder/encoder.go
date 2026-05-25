@@ -297,6 +297,7 @@ func (e *Encoder) processQueue() {
 			Width:     job.FileInfo.Width,
 			Height:    job.FileInfo.Height,
 			Framerate: job.FileInfo.Framerate,
+			HasAudio:  job.FileInfo.AudioCodec != "",
 		}
 		encoderID := e.GetSelectedEncoder()
 		quality := e.GetQuality()
