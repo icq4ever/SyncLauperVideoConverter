@@ -102,6 +102,25 @@
         <div class="error-item">
           <span class="error-filename">{err.filename}</span>
           <pre class="error-message">{err.error}</pre>
+          {#if err.command || err.log}
+            <details class="error-log-details">
+              <summary>자세한 로그 보기{err.logPath ? ` (저장 위치: ${err.logPath})` : ''}</summary>
+              {#if err.command}
+                <div class="log-section-header">
+                  <span>ffmpeg 명령</span>
+                  <button class="copy-btn" on:click={() => navigator.clipboard.writeText(err.command ?? '')}>복사</button>
+                </div>
+                <pre class="log-block">{err.command}</pre>
+              {/if}
+              {#if err.log}
+                <div class="log-section-header">
+                  <span>ffmpeg 출력</span>
+                  <button class="copy-btn" on:click={() => navigator.clipboard.writeText(err.log ?? '')}>복사</button>
+                </div>
+                <pre class="log-block">{err.log}</pre>
+              {/if}
+            </details>
+          {/if}
         </div>
       {/each}
     </div>
@@ -257,6 +276,64 @@
     white-space: pre-wrap;
     word-break: break-all;
     max-height: 80px;
+    overflow-y: auto;
+  }
+
+  .error-log-details {
+    margin-top: 6px;
+    font-size: 11px;
+  }
+
+  .error-log-details summary {
+    cursor: pointer;
+    color: var(--text-secondary, #888);
+    padding: 4px 0;
+    user-select: none;
+  }
+
+  .error-log-details summary:hover {
+    color: var(--text-primary, #fff);
+  }
+
+  .log-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    color: var(--text-secondary, #888);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .copy-btn {
+    padding: 2px 8px;
+    font-size: 10px;
+    background: var(--bg-tertiary, #252525);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    color: var(--text-secondary, #888);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .copy-btn:hover {
+    background: var(--bg-hover, #2a2a2a);
+    color: var(--text-primary, #fff);
+  }
+
+  .log-block {
+    font-size: 10.5px;
+    line-height: 1.4;
+    background: var(--bg-primary, #0d0d0d);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 4px;
+    padding: 8px;
+    margin: 0;
+    color: var(--text-secondary, #aaa);
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 240px;
     overflow-y: auto;
   }
 

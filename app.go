@@ -73,6 +73,10 @@ func (a *App) startup(ctx context.Context) {
 		runtime.EventsEmit(a.ctx, "encoding:error", map[string]interface{}{
 			"error":    err.Error(),
 			"filename": job.FileInfo.Name,
+			"jobId":    job.ID,
+			"command":  job.Command,
+			"log":      job.Log,
+			"logPath":  job.OutputPath + ".log",
 		})
 	})
 
@@ -409,6 +413,19 @@ func (a *App) SetRotation(degrees int) {
 	a.encoder.SetRotation(degrees)
 }
 
+// JobLog is the encoded ffmpeg command + stderr capture for one job.
+type JobLog struct {
+	Command string `json:"command"`
+	Log     string `json:"log"`
+	Found   bool   `json:"found"`
+}
+
+// GetJobLog returns the captured ffmpeg command + stderr for a job by ID.
+func (a *App) GetJobLog(jobID string) JobLog {
+	cmd, log, found := a.encoder.GetJobLog(jobID)
+	return JobLog{Command: cmd, Log: log, Found: found}
+}
+
 // OpenFileDialog opens a file selection dialog
 func (a *App) OpenFileDialog() ([]string, error) {
 	files, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
@@ -449,7 +466,7 @@ func (a *App) GetAppInfo() map[string]string {
 	version, _ := a.encoder.GetFFmpegVersion()
 	return map[string]string{
 		"appName":        "SyncLauper VideoConverter",
-		"appVersion":     "1.2.1",
+		"appVersion":     "1.2.2",
 		"ffmpegVersion":  version,
 	}
 }

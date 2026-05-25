@@ -22,6 +22,8 @@ type EncodingJob struct {
 	Status     string             `json:"status"`
 	Progress   float64            `json:"progress"`
 	Error      string             `json:"error,omitempty"`
+	Command    string             `json:"command,omitempty"` // ffmpeg command line that was run
+	Log        string             `json:"log,omitempty"`     // captured ffmpeg stderr
 }
 
 // Encoder manages encoding jobs
@@ -294,10 +296,11 @@ func (e *Encoder) processQueue() {
 
 		// Build FFmpeg arguments with selected encoder
 		sourceInfo := &preset.FileInfo{
-			Width:     job.FileInfo.Width,
-			Height:    job.FileInfo.Height,
-			Framerate: job.FileInfo.Framerate,
-			HasAudio:  job.FileInfo.AudioCodec != "",
+			Width:           job.FileInfo.Width,
+			Height:          job.FileInfo.Height,
+			Framerate:       job.FileInfo.Framerate,
+			HasAudio:        job.FileInfo.AudioCodec != "",
+			DurationSeconds: job.FileInfo.DurationSeconds,
 		}
 		encoderID := e.GetSelectedEncoder()
 		quality := e.GetQuality()
@@ -341,13 +344,21 @@ func (e *Encoder) processQueue() {
 
 		// Handle result
 		e.mu.Lock()
-		if err != nil || !result.Success {
+		if result != nil {
+			job.Command = result.Command
+			job.Log = result.FullLog
+		}
+		if err != nil || result == nil || !result.Success {
 			job.Status = StatusError
 			if err != nil {
 				job.Error = err.Error()
-			} else {
+			} else if result != nil {
 				job.Error = result.Error
 			}
+
+			// Always write a sidecar .log file for failed jobs so the user can
+			// inspect the full ffmpeg output even if the UI panel is closed.
+			writeJobLog(job)
 
 			if e.errorCb != nil {
 				go e.errorCb(fmt.Errorf("%s", job.Error), job)
@@ -384,6 +395,38 @@ func (e *Encoder) processQueue() {
 		go e.allCompleteCb(completed, failed)
 	}
 	e.mu.Unlock()
+}
+
+// writeJobLog writes the captured ffmpeg command and stderr to a sidecar
+// .log file next to the job's intended output. Best-effort: errors are ignored.
+func writeJobLog(job *EncodingJob) {
+	if job == nil || job.Command == "" && job.Log == "" {
+		return
+	}
+	logPath := job.OutputPath + ".log"
+	content := fmt.Sprintf(
+		"# SyncLauper VideoConverter encoding log\n"+
+			"input:  %s\n"+
+			"output: %s\n"+
+			"status: %s\n"+
+			"error:  %s\n\n"+
+			"## ffmpeg command\n%s\n\n"+
+			"## ffmpeg stderr\n%s\n",
+		job.InputPath, job.OutputPath, job.Status, job.Error, job.Command, job.Log,
+	)
+	_ = os.WriteFile(logPath, []byte(content), 0644)
+}
+
+// GetJobLog returns the captured ffmpeg command + stderr for a job by ID.
+func (e *Encoder) GetJobLog(jobID string) (command string, log string, found bool) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	for _, j := range e.jobs {
+		if j.ID == jobID {
+			return j.Command, j.Log, true
+		}
+	}
+	return "", "", false
 }
 
 // GetCurrentProgress returns the current encoding progress

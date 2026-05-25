@@ -8,10 +8,11 @@ import (
 
 // FileInfo represents source file information (used for dynamic preset calculation)
 type FileInfo struct {
-	Width     int
-	Height    int
-	Framerate float64
-	HasAudio  bool
+	Width           int
+	Height          int
+	Framerate       float64
+	HasAudio        bool
+	DurationSeconds float64
 }
 
 // GetAllPresets returns all available SyncLauper presets
@@ -197,9 +198,13 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 	}
 
 	hasAudio := sourceInfo != nil && sourceInfo.HasAudio
+	srcDuration := 0.0
+	if sourceInfo != nil {
+		srcDuration = sourceInfo.DurationSeconds
+	}
 
 	if blackIntroDuration > 0 || blackOutroDuration > 0 {
-		return p.buildArgsWithBlackPad(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration, blackOutroDuration, rotation, hasAudio)
+		return p.buildArgsWithBlackPad(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration, blackOutroDuration, rotation, hasAudio, srcDuration)
 	}
 
 	return p.buildStandardArgs(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, rotation, hasAudio)
@@ -216,9 +221,10 @@ func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings Encodi
 
 	// If the source has no audio, inject a near-silent white noise track so the
 	// output always carries an audio stream (keeps SyncLauper playback consistent).
+	// -shortest stops the output once the video stream ends.
 	if !hasAudio {
 		args = append(args,
-			"-f", "lavfi", "-i", "anoisesrc=color=white:amplitude=0.001",
+			"-f", "lavfi", "-i", "anoisesrc=color=white:amplitude=0.00001:sample_rate=48000",
 			"-map", "0:v", "-map", "1:a", "-shortest",
 		)
 	}
@@ -273,7 +279,7 @@ func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings Encodi
 }
 
 // buildArgsWithBlackPad builds FFmpeg args with black intro and/or outro padding
-func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, introDuration, outroDuration int, rotation int, hasAudio bool) []string {
+func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, introDuration, outroDuration int, rotation int, hasAudio bool, srcDurationSecs float64) []string {
 	fpsStr := fmt.Sprintf("%.3f", effectiveFPS)
 
 	// Output (post-rotation) dimensions used for black pad frames and encoder level.
@@ -307,12 +313,18 @@ func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings En
 	srcIdx := inputIdx
 	inputIdx++
 
-	// If source has no audio stream, add a near-silent white noise track and use
-	// it in place of the missing source audio during concat.
+	// If source has no audio stream, add a near-silent white noise track capped
+	// at the source's duration (anoisesrc is otherwise infinite and would block
+	// ffmpeg from finishing the concat).
 	srcAudioIdx := srcIdx
 	if !hasAudio {
+		dur := srcDurationSecs
+		if dur <= 0 {
+			dur = 86400 // 24h safety cap when duration is unknown
+		}
 		args = append(args,
-			"-f", "lavfi", "-i", "anoisesrc=color=white:amplitude=0.001:sample_rate=48000",
+			"-f", "lavfi", "-t", fmt.Sprintf("%.3f", dur),
+			"-i", "anoisesrc=color=white:amplitude=0.00001:sample_rate=48000",
 		)
 		srcAudioIdx = inputIdx
 		inputIdx++

@@ -2,11 +2,19 @@ import { writable, derived } from 'svelte/store';
 import type { EncodingProgress, EncodingStatus } from '../types';
 
 // Encoding state
+export interface EncodingErrorFile {
+  filename: string;
+  error: string;
+  command?: string;
+  log?: string;
+  logPath?: string;
+}
+
 export interface EncodingState {
   isEncoding: boolean;
   currentProgress: EncodingProgress | null;
   completedFiles: string[];
-  errorFiles: { filename: string; error: string }[];
+  errorFiles: EncodingErrorFile[];
 }
 
 const initialState: EncodingState = {
@@ -53,10 +61,10 @@ export function fileCompleted(filename: string) {
   }));
 }
 
-export function fileError(filename: string, error: string) {
+export function fileError(filename: string, error: string, extra?: { command?: string; log?: string; logPath?: string }) {
   encodingState.update(state => ({
     ...state,
-    errorFiles: [...state.errorFiles, { filename, error }],
+    errorFiles: [...state.errorFiles, { filename, error, ...(extra ?? {}) }],
   }));
 }
 

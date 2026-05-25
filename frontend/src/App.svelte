@@ -91,8 +91,8 @@
       fileStatuses = fileStatuses;
     });
 
-    EventsOn('encoding:error', (data: { error: string; filename: string }) => {
-      fileError(data.filename, data.error);
+    EventsOn('encoding:error', (data: { error: string; filename: string; jobId?: string; command?: string; log?: string; logPath?: string }) => {
+      fileError(data.filename, data.error, { command: data.command, log: data.log, logPath: data.logPath });
 
       // Update file status
       fileStatuses.set(data.filename, {

@@ -113,6 +113,8 @@ type EncodeResult struct {
 	Success    bool   `json:"success"`
 	OutputPath string `json:"outputPath"`
 	Error      string `json:"error,omitempty"`
+	Command    string `json:"command,omitempty"`    // The full ffmpeg command line that was run
+	FullLog    string `json:"fullLog,omitempty"`    // Full captured stderr output
 }
 
 // ProgressCallback is called with progress updates during encoding
@@ -127,7 +129,8 @@ func (f *FFmpeg) Encode(ctx context.Context, args []string, durationSecs float64
 	fullArgs = append(fullArgs, "-progress", "pipe:1")
 	fullArgs = append(fullArgs, args...)
 
-	fmt.Printf("[FFmpeg] %s %s\n", f.config.ExecutablePath, strings.Join(fullArgs, " "))
+	cmdLine := fmt.Sprintf("%s %s", f.config.ExecutablePath, strings.Join(fullArgs, " "))
+	fmt.Printf("[FFmpeg] %s\n", cmdLine)
 
 	cmd := exec.CommandContext(ctx, f.config.ExecutablePath, fullArgs...)
 	cmdutil.HideWindow(cmd)
@@ -219,6 +222,8 @@ func (f *FFmpeg) Encode(ctx context.Context, args []string, durationSecs float64
 		return &EncodeResult{
 			Success: false,
 			Error:   "encoding cancelled",
+			Command: cmdLine,
+			FullLog: stderrOutput.String(),
 		}, nil
 	}
 
@@ -237,6 +242,8 @@ func (f *FFmpeg) Encode(ctx context.Context, args []string, durationSecs float64
 		fmt.Printf("[FFmpeg Error] %s\n", errMsg)
 		return &EncodeResult{
 			Success: false,
+			Command: cmdLine,
+			FullLog: stderrOutput.String(),
 			Error:   errMsg,
 		}, nil
 	}
@@ -250,6 +257,8 @@ func (f *FFmpeg) Encode(ctx context.Context, args []string, durationSecs float64
 	return &EncodeResult{
 		Success:    true,
 		OutputPath: outputPath,
+		Command:    cmdLine,
+		FullLog:    stderrOutput.String(),
 	}, nil
 }
 

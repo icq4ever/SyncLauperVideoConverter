@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2026-05-25
+
+### Fixed
+
+- **Encoding stalls at 99.9% on silent sources** - The injected `anoisesrc` track was infinite, so in the black-pad path ffmpeg never reached EOF and the job hung at the very end. Now capped to the source duration via `-t`
+- **Audible hiss on muted outputs** - Lowered the injected noise amplitude from `0.001` to `0.00001` (≈-100 dB) so the dummy audio track is effectively silent while still being detected by every decoder
+
+### Added
+
+- **Encoding logs in the UI** - Each failed file now exposes a collapsible "자세한 로그 보기" panel with the exact ffmpeg command and full stderr, plus a copy button for each
+- **Sidecar `.log` files** - Failed jobs also write `<output>.mkv.log` next to the intended output, so the full log survives across app restarts
+
 ## [1.2.1] - 2026-05-25
 
 ### Fixed
