@@ -3,6 +3,7 @@ package preset
 import (
 	"fmt"
 	"math"
+	"strings"
 )
 
 // FileInfo represents source file information (used for dynamic preset calculation)
@@ -144,11 +145,25 @@ func DetermineLevel(width, height int, fps float64) string {
 
 // ToFFmpegArgs converts a preset to FFmpeg arguments
 func (p *Preset) ToFFmpegArgs(inputPath, outputPath string, sourceInfo *FileInfo) []string {
-	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265", 0, 0, 0)
+	return p.ToFFmpegArgsWithEncoder(inputPath, outputPath, sourceInfo, "libx265", 0, 0, 0, 0)
+}
+
+// rotateFilter returns the ffmpeg filter expression for a given rotation in degrees,
+// or "" if rotation is not applied.
+func rotateFilter(degrees int) string {
+	switch degrees {
+	case 90:
+		return "transpose=1"
+	case 180:
+		return "transpose=2,transpose=2"
+	case 270:
+		return "transpose=2"
+	}
+	return ""
 }
 
 // ToFFmpegArgsWithEncoder converts a preset to FFmpeg arguments with specified encoder
-func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string, quality int, blackIntroDuration int, blackOutroDuration int) []string {
+func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInfo *FileInfo, encoderID string, quality int, blackIntroDuration int, blackOutroDuration int, rotation int) []string {
 	settings := DefaultSettings()
 	if quality > 0 {
 		settings.Quality = quality
@@ -181,14 +196,14 @@ func (p *Preset) ToFFmpegArgsWithEncoder(inputPath, outputPath string, sourceInf
 	}
 
 	if blackIntroDuration > 0 || blackOutroDuration > 0 {
-		return p.buildArgsWithBlackPad(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration, blackOutroDuration)
+		return p.buildArgsWithBlackPad(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, blackIntroDuration, blackOutroDuration, rotation)
 	}
 
-	return p.buildStandardArgs(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint)
+	return p.buildStandardArgs(inputPath, outputPath, settings, encoderID, effectiveWidth, effectiveHeight, effectiveFPS, effectiveLevel, keyint, rotation)
 }
 
 // buildStandardArgs builds FFmpeg args without black intro (original logic)
-func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int) []string {
+func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, rotation int) []string {
 	args := []string{}
 
 	// Add pre-input args for hardware encoders (must come before -i)
@@ -196,12 +211,29 @@ func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings Encodi
 
 	args = append(args, "-i", inputPath)
 
-	// Add encoder-specific video codec options
-	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint, effectiveWidth, effectiveHeight)...)
+	// For 90/270 rotation the output dimensions are swapped — adjust the level
+	// calculation to reflect the post-rotation frame size.
+	encWidth, encHeight := effectiveWidth, effectiveHeight
+	if rotation == 90 || rotation == 270 {
+		encWidth, encHeight = effectiveHeight, effectiveWidth
+	}
 
-	// Add resolution if not using source
+	// Add encoder-specific video codec options
+	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint, encWidth, encHeight)...)
+
+	// Build the video filter chain: decomb → scale → rotate
+	filters := []string{}
+	if settings.Decomb {
+		filters = append(filters, "yadif=mode=0:parity=-1:deint=1")
+	}
 	if !p.UseSourceRes && p.Width > 0 && p.Height > 0 {
-		args = append(args, "-vf", fmt.Sprintf("scale=%d:%d", p.Width, p.Height))
+		filters = append(filters, fmt.Sprintf("scale=%d:%d", p.Width, p.Height))
+	}
+	if rf := rotateFilter(rotation); rf != "" {
+		filters = append(filters, rf)
+	}
+	if len(filters) > 0 {
+		args = append(args, "-vf", strings.Join(filters, ","))
 	}
 
 	// Add framerate if not using source
@@ -221,20 +253,6 @@ func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings Encodi
 		"-ac", "2",
 	)
 
-	// Deinterlace filter (equivalent to HandBrake's decomb)
-	if settings.Decomb {
-		if !p.UseSourceRes && p.Width > 0 {
-			for i, arg := range args {
-				if arg == "-vf" && i+1 < len(args) {
-					args[i+1] = "yadif=mode=0:parity=-1:deint=1," + args[i+1]
-					break
-				}
-			}
-		} else {
-			args = append(args, "-vf", "yadif=mode=0:parity=-1:deint=1")
-		}
-	}
-
 	// Output format
 	args = append(args, "-f", "matroska")
 	args = append(args, outputPath)
@@ -243,8 +261,14 @@ func (p *Preset) buildStandardArgs(inputPath, outputPath string, settings Encodi
 }
 
 // buildArgsWithBlackPad builds FFmpeg args with black intro and/or outro padding
-func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, introDuration, outroDuration int) []string {
+func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings EncodingSettings, encoderID string, effectiveWidth, effectiveHeight int, effectiveFPS float64, effectiveLevel string, keyint int, introDuration, outroDuration int, rotation int) []string {
 	fpsStr := fmt.Sprintf("%.3f", effectiveFPS)
+
+	// Output (post-rotation) dimensions used for black pad frames and encoder level.
+	padWidth, padHeight := effectiveWidth, effectiveHeight
+	if rotation == 90 || rotation == 270 {
+		padWidth, padHeight = effectiveHeight, effectiveWidth
+	}
 
 	// Add pre-input args for hardware encoders (must come before -i)
 	args := getPreInputArgs(encoderID)
@@ -256,7 +280,7 @@ func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings En
 
 	if introDuration > 0 {
 		args = append(args,
-			"-f", "lavfi", "-i", fmt.Sprintf("color=black:s=%dx%d:d=%d:r=%s", effectiveWidth, effectiveHeight, introDuration, fpsStr),
+			"-f", "lavfi", "-i", fmt.Sprintf("color=black:s=%dx%d:d=%d:r=%s", padWidth, padHeight, introDuration, fpsStr),
 		)
 		introVIdx = inputIdx
 		inputIdx++
@@ -273,7 +297,7 @@ func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings En
 
 	if outroDuration > 0 {
 		args = append(args,
-			"-f", "lavfi", "-i", fmt.Sprintf("color=black:s=%dx%d:d=%d:r=%s", effectiveWidth, effectiveHeight, outroDuration, fpsStr),
+			"-f", "lavfi", "-i", fmt.Sprintf("color=black:s=%dx%d:d=%d:r=%s", padWidth, padHeight, outroDuration, fpsStr),
 		)
 		outroVIdx = inputIdx
 		inputIdx++
@@ -284,18 +308,22 @@ func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings En
 		inputIdx++
 	}
 
-	// Apply scale/decomb filter on source video if needed
+	// Build per-source video filter chain: decomb → scale → rotate
+	srcFilters := []string{}
+	if settings.Decomb {
+		srcFilters = append(srcFilters, "yadif=mode=0:parity=-1:deint=1")
+	}
+	if !p.UseSourceRes && p.Width > 0 && p.Height > 0 {
+		srcFilters = append(srcFilters, fmt.Sprintf("scale=%d:%d", p.Width, p.Height))
+	}
+	if rf := rotateFilter(rotation); rf != "" {
+		srcFilters = append(srcFilters, rf)
+	}
+
 	srcVideoLabel := fmt.Sprintf("[%d:v]", srcIdx)
 	videoFilter := ""
-	if !p.UseSourceRes && p.Width > 0 && p.Height > 0 {
-		videoFilter = fmt.Sprintf("[%d:v]scale=%d:%d", srcIdx, p.Width, p.Height)
-		if settings.Decomb {
-			videoFilter += ",yadif=mode=0:parity=-1:deint=1"
-		}
-		videoFilter += "[srcv];"
-		srcVideoLabel = "[srcv]"
-	} else if settings.Decomb {
-		videoFilter = fmt.Sprintf("[%d:v]yadif=mode=0:parity=-1:deint=1[srcv];", srcIdx)
+	if len(srcFilters) > 0 {
+		videoFilter = fmt.Sprintf("[%d:v]%s[srcv];", srcIdx, strings.Join(srcFilters, ","))
 		srcVideoLabel = "[srcv]"
 	}
 
@@ -317,8 +345,8 @@ func (p *Preset) buildArgsWithBlackPad(inputPath, outputPath string, settings En
 	args = append(args, "-filter_complex", filterComplex)
 	args = append(args, "-map", "[v]", "-map", "[a]")
 
-	// Add encoder-specific video codec options
-	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint, effectiveWidth, effectiveHeight)...)
+	// Add encoder-specific video codec options (use post-rotation dimensions)
+	args = append(args, getEncoderArgs(encoderID, settings, effectiveLevel, keyint, padWidth, padHeight)...)
 
 	// Add framerate if not using source
 	if !p.UseSourceFPS && p.FPS > 0 {

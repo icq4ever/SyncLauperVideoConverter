@@ -41,6 +41,7 @@ type Encoder struct {
 	qualityLevel       int    // CRF value (0 = use default)
 	blackIntroDuration int    // Black intro duration in seconds (0 = disabled)
 	blackOutroDuration int    // Black outro duration in seconds (0 = disabled)
+	rotation           int    // Rotation degrees: 0, 90, 180, 270
 }
 
 // NewEncoder creates a new Encoder instance
@@ -151,6 +152,25 @@ func (e *Encoder) GetBlackOutroDuration() int {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	return e.blackOutroDuration
+}
+
+// SetRotation sets the rotation in degrees (0, 90, 180, 270; 0 = no rotation)
+func (e *Encoder) SetRotation(degrees int) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	switch degrees {
+	case 90, 180, 270:
+		e.rotation = degrees
+	default:
+		e.rotation = 0
+	}
+}
+
+// GetRotation returns the current rotation in degrees
+func (e *Encoder) GetRotation() int {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	return e.rotation
 }
 
 // AddJob adds a new encoding job to the queue
@@ -282,7 +302,8 @@ func (e *Encoder) processQueue() {
 		quality := e.GetQuality()
 		blackIntro := e.GetBlackIntroDuration()
 		blackOutro := e.GetBlackOutroDuration()
-		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID, quality, blackIntro, blackOutro)
+		rotation := e.GetRotation()
+		args := job.Preset.ToFFmpegArgsWithEncoder(job.InputPath, job.OutputPath, sourceInfo, encoderID, quality, blackIntro, blackOutro, rotation)
 
 		// Progress callback wrapper
 		progressWrapper := func(progress *EncodingProgress) {

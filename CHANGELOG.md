@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-05-25
+
+### Added
+
+- **Video rotation option** - Rotate output video by 90°, 180°, or 270° (clockwise). Selector lives next to the black intro/outro controls and applies to all files in the queue. Output dimensions and encoder level are adjusted automatically for 90°/270°, and black pad frames are sized to match the rotated video
+
 ## [1.1.6] - 2026-04-16
 
 ### Changed

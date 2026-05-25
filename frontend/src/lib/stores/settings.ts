@@ -30,6 +30,9 @@ export const blackIntroDuration = writable<number>(1);
 export const blackOutroEnabled = writable<boolean>(true);
 export const blackOutroDuration = writable<number>(1);
 
+// Rotation in degrees: 0 (none), 90, 180, 270
+export const rotation = writable<number>(0);
+
 // Derived store for selected preset
 export const selectedPreset = derived(
   [presets, selectedPresetName],

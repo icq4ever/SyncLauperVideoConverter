@@ -2,8 +2,8 @@
   import { createEventDispatcher } from 'svelte';
   import { files, selectedFiles, selectedCount, durationMismatch } from '../stores/files';
   import { isEncoding } from '../stores/encoding';
-  import { selectedPreset, selectedPresetName, selectedEncoderID, selectedQuality, blackIntroEnabled, blackIntroDuration, blackOutroEnabled, blackOutroDuration } from '../stores/settings';
-  import { StartEncoding, CancelEncoding, CheckDurationMismatch, SetEncoder, SetQuality, SetBlackIntroDuration, SetBlackOutroDuration } from '../../../wailsjs/go/main/App';
+  import { selectedPreset, selectedPresetName, selectedEncoderID, selectedQuality, blackIntroEnabled, blackIntroDuration, blackOutroEnabled, blackOutroDuration, rotation } from '../stores/settings';
+  import { StartEncoding, CancelEncoding, CheckDurationMismatch, SetEncoder, SetQuality, SetBlackIntroDuration, SetBlackOutroDuration, SetRotation } from '../../../wailsjs/go/main/App';
   import { startEncoding, stopEncoding } from '../stores/encoding';
 
   const dispatch = createEventDispatcher();
@@ -108,6 +108,7 @@
       await SetQuality($selectedQuality);
       await SetBlackIntroDuration($blackIntroEnabled ? $blackIntroDuration : 0);
       await SetBlackOutroDuration($blackOutroEnabled ? $blackOutroDuration : 0);
+      await SetRotation($rotation);
       startEncoding();
       await StartEncoding($selectedPresetName);
     } catch (error) {
@@ -149,6 +150,11 @@
     const target = event.target as HTMLSelectElement;
     blackOutroDuration.set(Number(target.value));
   }
+
+  function handleRotationChange(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    rotation.set(Number(target.value));
+  }
 </script>
 
 <div class="control-buttons">
@@ -189,6 +195,18 @@
       <option value={1}>1초</option>
       <option value={2}>2초</option>
       <option value={3}>3초</option>
+    </select>
+
+    <label class="rotation-label">회전</label>
+    <select
+      value={$rotation}
+      on:change={handleRotationChange}
+      disabled={$isEncoding}
+    >
+      <option value={0}>없음</option>
+      <option value={90}>90°</option>
+      <option value={180}>180°</option>
+      <option value={270}>270°</option>
     </select>
   </div>
 
@@ -303,6 +321,13 @@
     color: var(--text-secondary, #888);
     cursor: pointer;
     white-space: nowrap;
+  }
+
+  .rotation-label {
+    font-size: 13px;
+    color: var(--text-secondary, #888);
+    white-space: nowrap;
+    margin-left: 4px;
   }
 
   .checkbox-label input[type="checkbox"] {
